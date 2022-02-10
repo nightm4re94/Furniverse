@@ -1,9 +1,9 @@
 const cacheName = "gurkenlabs-Furniverse Annotator-1.0";
 const contentToCache = [
-    "Build/WebGL.loader.js",
-    "Build/WebGL.framework.js.br",
-    "Build/WebGL.data.br",
-    "Build/WebGL.wasm.br",
+    "Build/Furniverse.loader.js",
+    "Build/Furniverse.framework.js",
+    "Build/Furniverse.data",
+    "Build/Furniverse.wasm",
     "TemplateData/style.css"
 
 ];
