@@ -1,0 +1,15 @@
+{
+    "name": "Furniverse Annotator",
+    "short_name": "Furniverse Annotator",
+    "start_url": "index.html",
+    "display": "fullscreen",
+    "background_color": "#828080",
+    "theme_color": "#fff",
+    "description": "The Multimodal Digital Furnishing Dataset",
+    "icons": [{
+      "src": "TemplateData/icons/unity-logo-light.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }]
+  }
