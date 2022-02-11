@@ -27,4 +27,10 @@ Furniverse is a crowd-sourced project, i.e. everyone proficient in the German la
 * Inside the application, you will receive detailed instructions in German.
 # Acknowledgements
 * Thank you to everyone taking their time to contribute descriptions to Furniverse!
+# Troubleshooting / FAQ / Contact
+**Q:** I've successfully entered my personal Data. Why does the application not proceed when I hit *Experiment starten*?  
+**A:** The database cannot be contacted or the request was blocked. This can be related to VPN / proxy / firewall configurations not allowing the requests OR due to a missing internet connection.
+
+**You have a question or any technical issues with the Furniverse Annotator?**  
+**Contact us under [st108805@stud.uni-stuttgart.de](mailto:st108805@stud.uni-stuttgart.de)!**
 
