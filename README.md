@@ -10,9 +10,9 @@ For each object, we automatically generate screenshots from multiple angles whic
 
 ### Example
 
-| model ID | screenshot example | literal description | sentimental description |
-| :------: | :----------------: | :----------------- | :--------------------- |
-| *chair-12* | <img src="https://raw.githubusercontent.com/nightm4re94/FurniVerse/main/models/chair-12_0_frontal.png" height="200"> | Desk chair on casters with black and red leatherette upholstery, lumbar support, neck cushion and armrests. | Expensive but generic-looking gaming accessory with a racing look. Particularly back-friendly. |
+| model-ID | screenshot example | literal description | sentimental description |
+| :--------: | :----------------: | :----------------- | :--------------------- |
+| *chair-12* | <img src="https://raw.githubusercontent.com/nightm4re94/FurniVerse/main/models/chair-12_0_frontal.png" height="150"> | Desk chair on casters <br/> with black and red <br/> leatherette upholstery,<br/>lumbar support, <br/> neck cushion, and armrests. | Expensive but generic-looking<br/> gaming accessory with a racing look. <br/> Particularly back-friendly. |
 
 # Contribute Annotations
 Furniverse is a crowd-sourced project, i.e. everyone proficient in the German language can contribute descriptions by downloading our Furniverse Annotator and investing between 30 and 60 minutes. 
