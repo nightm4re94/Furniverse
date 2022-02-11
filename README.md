@@ -20,11 +20,11 @@ Furniverse is a crowd-sourced project, i.e. everyone proficient in the German la
 * Download the [latest version of our Furniverse Annotator](https://github.com/nightm4re94/Furniverse/releases/latest).
 * Unpack the `.zip` file.
 * Run the `Furniverse Annotator.exe`.
-* You need to be proficient in the German language
-* The process will take between 30 and 60 minutes of your time
-* The Furniverse Annotator runs only on Windows
-* Make sure you have an active internet connection throughout the annotation process
-* Inside the application, you will receive 
+* You need to be proficient in the German language.
+* The process will take between 30 and 60 minutes of your time.
+* The Furniverse Annotator runs only on Windows.
+* Make sure you have an active internet connection throughout the annotation process.
+* Inside the application, you will receive detailed instructions in German.
 # Acknowledgements
 * Thank you to everyone taking their time to contribute descriptions to Furniverse!
 
