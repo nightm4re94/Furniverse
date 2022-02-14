@@ -17,9 +17,9 @@ For each object, we automatically generate screenshots from multiple angles whic
 # Contribute Annotations
 Furniverse is a crowd-sourced project, i.e. everyone proficient in the German language can contribute descriptions by downloading our Furniverse Annotator and investing between 30 and 60 minutes. 
 ## Instructions / Requirements
-* Download the [latest version of our Furniverse Annotator](https://github.com/nightm4re94/Furniverse/releases/latest).
+* Download the [latest version of our Furniverse Annotator](https://github.com/nightm4re94/Furniverse/releases/latest) for your operating system.
 * Unpack the `.zip` file.
-* Run the `Furniverse Annotator.exe`.
+* Run the `Furniverse Annotator.exe` (Windows) / `Furniverse Annotator.x86_64` (Linux).
 * You need to be proficient in the German language.
 * The process will take between 30 and 60 minutes of your time.
 * The Furniverse Annotator runs only on Windows.
