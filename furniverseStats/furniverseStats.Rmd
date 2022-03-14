@@ -1,0 +1,182 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+literalStats <- read.table("literal.stats", sep = '\t', header= TRUE)
+sentimentalStats <- read.table("sentimental.stats", sep = '\t', header= TRUE)
+```
+
+```{r}
+library(colorspace)
+coul <- c("#2B4162","#D62246","#50C5B7","#FFBF46")
+fill <- adjustcolor(coul,alpha=0.8)
+bord <- sapply(coul, darken)
+```
+
+```{r}
+png('plots/lexiconCount.png', 800, 800, type = 'cairo')
+boxplot(literalStats$lexicon_count,sentimentalStats$lexicon_count,
+  main = "Lexicon count, literal vs. sentimental descriptions",
+  ylab = "lexicon count",
+  names = c("literal","sentimental"),
+  col = coul,
+  bg=coul,
+  pch=21,
+  border = bord,
+  cex.axis = 1.5,
+  cex.main = 1.5,
+  cex.lab = 1.5)
+dev.off()
+```
+
+```{r}
+png('plots/syllableCount.png', 800, 800, type = 'cairo')
+boxplot(literalStats$syllable_count,sentimentalStats$syllable_count,
+  main = "Syllable count, literal vs. sentimental descriptions",
+  ylab = "syllable count",
+  names = c("literal","sentimental"),
+  col = coul,
+  bg=coul,
+  pch=21,
+  border = bord,
+  cex.axis = 1.5,
+  cex.main = 1.5,
+  cex.lab = 1.5)
+dev.off()
+```
+
+```{r}
+png('plots/sentenceCount.png', 800, 800, type = 'cairo')
+boxplot(literalStats$sentence_count,sentimentalStats$sentence_count,
+  main = "Sentence count, literal vs. sentimental descriptions",
+  ylab = "sentence count",
+  names = c("literal","sentimental"),
+  col = coul,
+  bg=coul,
+  pch=21,
+  border = bord,
+  cex.axis = 1.5,
+  cex.main = 1.5,
+  cex.lab = 1.5)
+dev.off()
+```
+
+```{r}
+png('plots/characterCount.png', 800, 800, type = 'cairo')
+boxplot(literalStats$char_count,sentimentalStats$char_count,
+  main = "Character count, literal vs. sentimental descriptions",
+  ylab = "character count",
+  names = c("literal","sentimental"),
+  col = coul,
+  bg=coul,
+  pch=21,
+  border = bord,
+  cex.axis = 1.5,
+  cex.main = 1.5,
+  cex.lab = 1.5)
+dev.off
+```
+
+```{r}
+png('plots/polysyllabcount.png', 800, 800, type = 'cairo')
+boxplot(literalStats$polysyllabcount,sentimentalStats$polysyllabcount,
+  main = "Polysyllabic word count, literal vs. sentimental descriptions",
+  ylab = "polysyllabic word count",
+  names = c("literal","sentimental"),
+  col = coul,
+  bg=coul,
+  pch=21,
+  border = bord,
+  cex.axis = 1.5,
+  cex.main = 1.5,
+  cex.lab = 1.5)
+dev.off()
+```
+
+```{r}
+png('plots/monosyllabcount.png', 800, 800, type = 'cairo')
+boxplot(literalStats$monosyllabcount,sentimentalStats$monosyllabcount,
+  main = "Monosyllabic word count, literal vs. sentimental descriptions",
+  ylab = "monosyllabic word count",
+  names = c("literal","sentimental"),
+  col = coul,
+  bg=coul,
+  pch=21,
+  border = bord,
+  cex.axis = 1.5,
+  cex.main = 1.5,
+  cex.lab = 1.5)
+dev.off()
+```
+
+```{r}
+png('plots/fleschReadingEase.png', 800, 800, type = 'cairo')
+boxplot(literalStats$flesch_reading_ease,sentimentalStats$flesch_reading_ease,
+  main = "Flesch reading ease, literal vs. sentimental descriptions",
+  ylab = "Flesch reading ease",
+  names = c("literal","sentimental"),
+  col = coul,
+  bg=coul,
+  pch=21,
+  border = bord,
+  cex.axis = 1.5,
+  cex.main = 1.5,
+  cex.lab = 1.5)
+dev.off()
+```
+
+```{r}
+png('plots/fleschKincaidGrade.png', 800, 800, type = 'cairo')
+boxplot(literalStats$flesch_kincaid_grade,sentimentalStats$flesch_kincaid_grade,
+  main = "Flesch-Kincaid grade level, literal vs. sentimental descriptions",
+  ylab = "Flesch-Kincaid grade level",
+  names = c("literal","sentimental"),
+  col = coul,
+  bg=coul,
+  pch=21,
+  border = bord,
+  cex.axis = 1.5,
+  cex.main = 1.5,
+  cex.lab = 1.5)
+dev.off()
+```
+
+```{r}
+png('plots/wsf.png', 800, 800, type = 'cairo')
+boxplot(literalStats$wiener_sachtextformel1,sentimentalStats$wiener_sachtextformel1,
+        literalStats$wiener_sachtextformel4,sentimentalStats$wiener_sachtextformel4,
+  main = "Wiener Sachtextformel, literal vs. sentimental descriptions",
+  ylab = "Wiener Sachtextformel",
+  names = c("WSF1, literal","WSF1, sentimental",
+            "WSF4, literal","WSF4, sentimental"),
+  col = coul,
+  bg=coul,
+  pch=21,
+  border = bord,
+  cex.axis = 1.5,
+  cex.main = 1.5,
+  cex.lab = 1.5)
+dev.off()
+
+```
+
+```{r}
+t_tests <- data.frame("variable",
+                    "t",
+                    "p_t-test",
+                    "r",
+                    "p_correlation")
+varnames <- colnames(literalStats[, c(3,4,5,6,7,8,9,10,11,12,13,14,15)])
+for (col in varnames) {
+  t <- t.test(literalStats[, col], sentimentalStats[, col])
+  c <- cor.test(literalStats[, col], sentimentalStats[, col])
+  t_tests <- rbind(t_tests, c(col,t$statistic,t$p.value,c$estimate,c$p.value))
+}
+```
+
+
+
