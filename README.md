@@ -1,3 +1,6 @@
+[![SWUbanner](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner2-direct.svg)](https://vshymanskyy.github.io/StandWithUkraine)
+
+
 ![](https://raw.githubusercontent.com/nightm4re94/FurniVerse/main/resources/banner.png)
 
 # Furniverse²²⁵
