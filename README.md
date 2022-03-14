@@ -3,6 +3,8 @@
 
 ![](https://raw.githubusercontent.com/nightm4re94/FurniVerse/main/resources/banner.png)
 
+[![StandWithUkraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://vshymanskyy.github.io/StandWithUkraine)
+
 # Furniverse²²⁵
 ## The Multimodal Digital Furnishing Dataset
 **Furniverse²²⁵** is an extensive database of pictures of 225 digital furnishing objects, combined with textual descriptions in the German language.
