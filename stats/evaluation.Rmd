@@ -16,6 +16,8 @@ library(colorspace)
 coul <- c("#FFC20A","#0C7BDC","#A72608","#134611")
 fill <- adjustcolor(coul,alpha=0.8)
 bord <- sapply(coul, darken)
+library(RColorBrewer)
+barPal <- brewer.pal(9,"Set1")
 ```
 
 ```{r}
@@ -146,10 +148,10 @@ for (title in description_vars){
                                                    which(joined_stats[,title] > 0),
                                                    which(joined_stats[,title_comp] > 0)))  
   lines(lowess(data.frame(joined_stats[,title][literalLineIndices],
-                          joined_stats[,title_comp][literalLineIndices])), 
+                          joined_stats[,title_comp][literalLineIndices], f=3)), 
                           col = "black", lty = 5, lwd = 3)
   lines(lowess(data.frame(joined_stats[,title][sentimentalLineIndices],
-                          joined_stats[,title_comp][sentimentalLineIndices])), 
+                          joined_stats[,title_comp][sentimentalLineIndices], f=3)), 
                           col = "black", lty=3, lwd = 3)
 
   legend("topleft",
@@ -178,6 +180,13 @@ write.csv(t_tests_comp,"surfaceStats_comp.csv", row.names=FALSE)
 
 
 ```{r}
+annotators$firstLanguage<-replace(annotators$firstLanguage, annotators$firstLanguage%in%c("de","deutsch","Deutsch"), "DE")
+annotators$firstLanguage<-replace(annotators$firstLanguage, annotators$firstLanguage=="portugiesisch", "PT")
+annotators$firstLanguage<-replace(annotators$firstLanguage, annotators$firstLanguage=="Arabisch", "AR")
+
+annotators$nationality<-replace(annotators$nationality, annotators$nationality%in%c("de","deutsch","Deutsch"), "DE")
+annotators$nationality<-replace(annotators$nationality, annotators$nationality=="Israelisch", "IL")
+annotators$nationality<-replace(annotators$nationality, annotators$nationality=="Ã–sterreichisch", "AT")
 
 for (title in annotator_vars_numeric){
   column <- annotators[,title]
@@ -197,5 +206,31 @@ for (title in annotator_vars_numeric){
   summary <- summary(column)
   annotator_stats <- rbind(annotator_stats, summary)
   # write.csv(summary,"annotatorStats.csv", row.names=FALSE)
+}
+
+library("plyr")
+for (title in annotator_vars_nonNumeric){
+  column <- annotators[,title]
+  max <- round_any(max(matrix(table(column))[,1]), 5, f = ceiling) 
+  png(sprintf("plots/%s.png",title), 800, 800, type = 'cairo')
+  par(mar=c(5,8,4,2) + 8) # Add space to left margin.
+  barplot(table(column)[order(table(column),decreasing = TRUE)],
+    horiz = TRUE,
+    xaxt = "n",
+    las=2,
+    main = title,
+    col = barPal,
+    bg=barPal,
+    bord=NA,
+    xlim = c(0, max),
+    cex.axis = 1.5,
+    cex.main = 1.5,
+    cex.lab = 2
+  )
+  axis(1, at = seq(0, max,  1),labels=NA)
+  axis(1, at = seq(0, max,  5), lwd=3)
+  par(mar=c(5,4,4,2) + 0.1) # Restore default spacing
+  dev.off()
+
 }
 ```
