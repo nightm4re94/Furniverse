@@ -47,13 +47,22 @@ annotator_vars <- names(annotators)[4:15]
 annotator_vars_numeric <- names(annotators)[c(4,11,12,13)]
 annotator_vars_nonNumeric <- names(annotators)[c(5,6,7,8,9,10,14,15)]
 annotator_stats <- data.frame()
-description_vars <- append(names(literal_stats)[3:31],annotator_vars_numeric)
+description_vars <- c(names(literal_stats)[3:31],annotator_vars_numeric, names(descriptions)[8])
 
 literal_stats$mode <- "literal"
 sentimental_stats$mode <- "sentimental"
 
 literal_stats$annotator <- descriptions$annotator[descriptions$X_id==literal_stats$X_id]
 sentimental_stats$annotator <- descriptions$annotator[descriptions$X_id==sentimental_stats$X_id]
+
+library(lubridate, warn.conflicts = FALSE)
+
+literal_stats$timeTaken <- as.duration(hms(descriptions$timeTaken[descriptions$X_id==literal_stats$X_id]))
+sentimental_stats$timeTaken <- as.duration(hms(descriptions$timeTaken[descriptions$X_id==sentimental_stats$X_id]))
+
+# Set description times over 10 minutes to the mean description time
+literal_stats$timeTaken[literal_stats$timeTaken>600] <- mean(literal_stats$timeTaken[literal_stats$timeTaken<=600])
+sentimental_stats$timeTaken[sentimental_stats$timeTaken>600] <- mean(sentimental_stats$timeTaken[sentimental_stats$timeTaken<=600])
 
 
 for (annotator_var in annotator_vars){
@@ -68,8 +77,15 @@ mode_colors  <-  ifelse(joined_stats$mode == "literal", coul[1], coul[2])
 mode_shapes  <-  ifelse(joined_stats$mode == "literal", 15, 19)
 ```
 
-```{r}
+Assumptions for pearson's correlation, inspired by Cohen(1988):
 
+|correlation coefficient value|strength of correlation|
+|:----------------------------|:----------------------|
+|0.3 < \| r \| <= .5          |weak                   |
+|0.5 < \| r \| <= .7          |moderate               |
+|0.7 < \| r \| <= 1           |strong                 |
+
+```{r}
 
 for (title in description_vars){
   literalVariableName <- sprintf("%s_literal", title)
@@ -112,7 +128,6 @@ for (title in description_vars){
   }
   for (title_comp in description_vars){
     if (title == title_comp) {
-      # || any(t_tests_comp[,1]==title_comp & t_tests_comp[,2]==title
       next
     }
     literalColumn_comp <- literal_stats[,title_comp]
@@ -129,7 +144,6 @@ for (title in description_vars){
     t_tests_comp <- rbind(t_tests_comp, stat_vector_comp)
 
     png(sprintf("plots/%s_vs_%s.png",title,title_comp), 800, 800, type = 'cairo')
-  
     plot(data.frame(joined_stats[title],joined_stats[title_comp]),
     main = sprintf("%s vs. %s", title, title_comp),
     xlab = title,
@@ -141,26 +155,34 @@ for (title in description_vars){
     cex.main = 1.5,
     cex.lab = 1.5)
   
-  literalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="literal"),
-                                              which(joined_stats[,title] > 0),
-                                              which(joined_stats[,title_comp] > 0)))
-  sentimentalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="sentimental"),
-                                                   which(joined_stats[,title] > 0),
-                                                   which(joined_stats[,title_comp] > 0)))  
-  lines(lowess(data.frame(joined_stats[,title][literalLineIndices],
-                          joined_stats[,title_comp][literalLineIndices], f=3)), 
-                          col = "black", lty = 5, lwd = 3)
-  lines(lowess(data.frame(joined_stats[,title][sentimentalLineIndices],
-                          joined_stats[,title_comp][sentimentalLineIndices], f=3)), 
-                          col = "black", lty=3, lwd = 3)
 
-  legend("topleft",
-       legend = levels(factor(joined_stats$mode)),
-       pch = c(NA,NA),
-       cex=1.5,
-       col = "black",
-       lty = c(5,3),
-       lwd = 3)
+ 
+  # Plot smoothing lines if there is at least a weak correlation (r>0.3)
+    if((abs(c_literal$estimate)>0.3)||(abs(c_literal$estimate)>0.3)){
+      literalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="literal"),
+                                                which(joined_stats[,title] > 0),
+                                                which(joined_stats[,title_comp] > 0)))
+      lines(lowess(data.frame(joined_stats[,title][literalLineIndices],
+                            joined_stats[,title_comp][literalLineIndices], f=3)), 
+                            col = "black", lty = 5, lwd = 3)
+      sentimentalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="sentimental"),
+                                                     which(joined_stats[,title] > 0),
+                                                     which(joined_stats[,title_comp] > 0)))
+      lines(lowess(data.frame(joined_stats[,title][sentimentalLineIndices],
+                            joined_stats[,title_comp][sentimentalLineIndices], f=3)), 
+                            col = "black", lty=3, lwd = 3)
+      legendLevels <- levels(factor(joined_stats$mode))
+      legendLevels[1] <- sprintf("%s, r = %.2f",legendLevels[1],c_literal$estimate)
+      legendLevels[2] <- sprintf("%s, r = %.2f",legendLevels[2],c_sentimental$estimate)
+      
+      legend("topleft",
+      legend = legendLevels,
+      pch = c(NA,NA),
+      cex=1.5,
+      col = "black",
+      lty = c(5,3),
+      lwd = 3)
+    }
   
   legend("topright",
        legend = levels(factor(joined_stats$mode)),
@@ -190,7 +212,8 @@ annotators$nationality<-replace(annotators$nationality, annotators$nationality==
 
 for (title in annotator_vars_numeric){
   column <- annotators[,title]
-  png(sprintf("plots/%s.png",title), 400, 400, type = 'cairo')
+  png(sprintf("plots/%s.png",title), 600, 600, type = 'cairo')
+  par(mar=c(2,5,4,2) + 0.1) 
   boxplot(column,
     main = sprintf("%s distribution", title),
     ylab = title,
@@ -198,10 +221,10 @@ for (title in annotator_vars_numeric){
     bg=coul,
     pch=21,
     border = bord,
-    cex.axis = 1.5,
-    cex.main = 1.5,
-    cex.lab = 1.5)
-  text(x=1.3, y=fivenum(column),labels=fivenum(column), font=2)
+    cex.axis = 2.0,
+    cex.main = 2.5,
+    cex.lab = 2.0)
+  text(x=1.3, y=fivenum(column),labels=fivenum(column), cex=1.5, font=2)
   dev.off()
   summary <- summary(column)
   annotator_stats <- rbind(annotator_stats, summary)
@@ -212,8 +235,8 @@ library("plyr")
 for (title in annotator_vars_nonNumeric){
   column <- annotators[,title]
   max <- round_any(max(matrix(table(column))[,1]), 5, f = ceiling) 
-  png(sprintf("plots/%s.png",title), 800, 800, type = 'cairo')
-  par(mar=c(5,8,4,2) + 8) # Add space to left margin.
+  png(sprintf("plots/%s.png",title), 1000, 650, type = 'cairo')
+  par(mar=c(5,30,4,2) + 0.1) # Add space to left margin.
   barplot(table(column)[order(table(column),decreasing = TRUE)],
     horiz = TRUE,
     xaxt = "n",
@@ -223,12 +246,13 @@ for (title in annotator_vars_nonNumeric){
     bg=barPal,
     bord=NA,
     xlim = c(0, max),
-    cex.axis = 1.5,
-    cex.main = 1.5,
-    cex.lab = 2
+    cex.axis = 2.5,
+    cex.lab = 2.5,
+    cex.main = 2.5,
+    cex.names = 1.8
   )
-  axis(1, at = seq(0, max,  1),labels=NA)
-  axis(1, at = seq(0, max,  5), lwd=3)
+  axis(1, at = seq(0, max,  1),labels=NA, cex.axis = 2.0)
+  axis(1, at = seq(0, max,  5), lwd=3, cex.axis = 2.0)
   par(mar=c(5,4,4,2) + 0.1) # Restore default spacing
   dev.off()
 
