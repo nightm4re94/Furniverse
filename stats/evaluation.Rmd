@@ -18,27 +18,32 @@ coul <- c("#FFC20A","#0C7BDC","#A72608","#134611")
 fill <- adjustcolor(coul,alpha=0.8)
 bord <- sapply(sapply(coul, darken), darken)
 library(RColorBrewer)
-barPal <- brewer.pal(9,"Set1")
-coul_15 <- c("#000000",
-             "#252525",
-             "#676767",
-             "#171723",
-             "#004949",
-             "#009999",
-             "#22cf22",
-             "#490092",
-             "#006ddb",
-             "#b66dff",
-             "#ff6db6",
-             "#920000",
-             "#8f4e00",
-             "#db6d00",
-             "#ffdf4d")
+barPal <- brewer.pal(12,"Set3")
+barPalBord <- sapply(sapply(barPal, darken), darken)
+
+coul_16 <- c("#2f4f4f",
+             "#8b4513",
+             "#006400",
+             "#bdb76b",
+             "#00008b",
+             "#ff0000",
+             "#00ced1",
+             "#ffa500",
+             "#ffff00",
+             "#00ff00",
+             "#00fa9a",
+             "#0000ff",
+             "#d8bfd8",
+             "#ff00ff",
+             "#1e90ff",
+             "#ff69b4")
+coul_16_Bord <- sapply(sapply(coul_16, darken), darken)
 
 titleSize <- 2.5
-axisLabelSize <- 2.0
-labelSize <- 2.0
-plotMargins <- c(6,6,4,2) + 0.1
+axisLabelSize <- 2.5
+labelSize <- 3
+legendLabelSize <- 2.5
+plotMargins <- c(6,9,12,4) + 0.1
 ```
 
 This section pretransforms our dataframes and assigns column names
@@ -93,7 +98,7 @@ for (annotator_var in annotator_vars){
 joined_stats <- rbind(literal_stats, sentimental_stats)
 
 
-mode_colors  <-  ifelse(joined_stats$mode == "literal", coul[1], coul[2])
+mode_colors  <-  ifelse(joined_stats$mode == "literal", coul[2], coul[1])
 mode_shapes  <-  ifelse(joined_stats$mode == "literal", 15, 19)
 ```
 
@@ -101,7 +106,7 @@ mode_shapes  <-  ifelse(joined_stats$mode == "literal", 15, 19)
 modePanel <- function (x, y, col = par("col"), bg = NA, pch = par("pch"), 
     cex = 1, col.smooth = 2, span = 2/3, iter = 3, ...) 
 {
-    points(x, y, pch = pch, col = col, bg = bg, cex = cex)
+    points(x, y, pch = pch, col = col, bg = bg, cex = cex, xlab = names(x), ylab = names(y))
     ok <- is.finite(x) & is.finite(y)
     
     # Plot smoothing lines if there is at least a weak correlation (r>0.3)
@@ -109,7 +114,7 @@ modePanel <- function (x, y, col = par("col"), bg = NA, pch = par("pch"),
       literalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="literal"), which(ok)))
       lines(lowess(data.frame(x[literalLineIndices],
                             y[literalLineIndices], f=3)),
-                            col = "black", lty = 5, lwd = 3)
+                            col = "black", lty = 2, lwd = 3)
       sentimentalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="sentimental"), which(ok)))
       lines(lowess(data.frame(x[sentimentalLineIndices],
                             y[sentimentalLineIndices], f=3)),
@@ -138,22 +143,20 @@ for (title in description_vars){
   sentimentalColumn <- sentimental_stats[,title]
 
   if(!title %in% annotator_vars_numeric&&title!="timeTaken"){
-  png(sprintf("plots/%s.png",title), 900, 800, type = 'cairo')
+  png(sprintf("plots/%s.png",title), 1200, 1200, type = 'cairo')
   par(mar=plotMargins) 
   boxplot(round(literalColumn,2), round(sentimentalColumn, 2),
     main = sprintf("%s, literal vs. sentimental descriptions", title),
     names = c("literal","sentimental"),
-    xlab = "description mode",
-    ylab = title,
     col = coul,
     bg=coul,
     pch=21,
     border = bord,
     cex.axis = axisLabelSize,
-    cex.main = titleSize,
-    cex.lab = labelSize)
-  text(x=1.5, y=fivenum(round(literalColumn,2)),labels=fivenum(round(literalColumn,2)), font=2)
-  text(x=2.5, y=fivenum(round(sentimentalColumn, 2)),labels=fivenum(round(sentimentalColumn, 2)), font=2)
+    cex.main = titleSize)
+  text(x=1.5, y=fivenum(round(literalColumn,2)),labels=fivenum(round(literalColumn,1)), cex = 0.8 * axisLabelSize)
+  text(x=2.5, y=fivenum(round(sentimentalColumn, 2)),labels=fivenum(round(sentimentalColumn, 1)), cex = 0.8 * axisLabelSize)
+  title(xlab = "description mode", ylab = title, cex.lab = labelSize, line = 4.5)
   dev.off()
   t <- t.test(literalColumn, sentimentalColumn)
   c <- cor.test(literalColumn, sentimentalColumn)
@@ -194,71 +197,60 @@ for (title in description_vars){
     if(any(t_tests_comp$variable == title_comp & t_tests_comp$variable_comp == title)){
       next
     }    
-    png(sprintf("plots/%s_vs_%s.png",title,title_comp), 900, 800, type = 'cairo')
+    png(sprintf("plots/%s_vs_%s.png",title,title_comp), 1200, 1200, type = 'cairo')
     par(mar=plotMargins) 
     pairs(data.frame(joined_stats[title],joined_stats[title_comp]),
-    main = sprintf("%s vs. %s", title, title_comp),
-    col = mode_colors,
-    pch=mode_shapes,
-    cex=1.5,
-    cex.axis = axisLabelSize,
-    cex.main = titleSize,
-    cex.lab = labelSize, 
-    panel = modePanel)
-    par(xpd = T, mar = par()$mar + c(0,0,0,7))
+      col = mode_colors,
+      pch=mode_shapes,
+      cex=1.5,
+      las=1,
+      cex.axis = axisLabelSize,
+      cex.main = titleSize,
+      cex.labels = labelSize,
+      panel = modePanel,
+      oma=plotMargins)
     
+    title(main = sprintf("%s vs. %s", title, title_comp), cex.main=titleSize, line = 6.5)
+
     if((abs(c_literal$estimate)>0.3)||(abs(c_literal$estimate)>0.3)){
       legendLevels <- levels(factor(joined_stats$mode))
       legendLevels[1] <- sprintf("%s, r = %.2f",legendLevels[1],c_literal$estimate)
       legendLevels[2] <- sprintf("%s, r = %.2f",legendLevels[2],c_sentimental$estimate)
-
+      
       legend("center",
       legend = legendLevels,
       pch = c(15,19),
-      cex=1.5,
-      col = c(coul[1], coul[2]),
-      lty = c(5,3),
-      lwd = 3)
+      cex=legendLabelSize,
+      pt.cex = 3,
+      col = c(coul[2], coul[1]),
+      text.col = "white",
+      text.width = 1.5 * legendLabelSize * strwidth(legendLevels)[1])
+      
+      legend("center",
+      legend = legendLevels,
+      cex=legendLabelSize,
+      pt.cex = 3,
+      col = "black",
+      lty = c(2,3),
+      lwd = 3,
+      bty="n",
+      text.col = "black",
+      text.width = 1.5 * legendLabelSize * strwidth(legendLevels)[1]
+      )
+      
+
     }else{
       legend("center",
       legend = levels(factor(joined_stats$mode)),
       pch = c(15,19),
-      cex=1.5,
-      col = c(coul[1], coul[2]))
+      cex=legendLabelSize,
+      col = c(coul[2], coul[1]))
     }
     dev.off()
   }
-
-
-  # # Plot smoothing lines if there is at least a weak correlation (r>0.3)
-  #   if((abs(c_literal$estimate)>0.3)||(abs(c_literal$estimate)>0.3)){
-  #     literalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="literal"),
-  #                                               which(joined_stats[,title] > 0),
-  #                                               which(joined_stats[,title_comp] > 0)))
-  #     lines(lowess(data.frame(joined_stats[,title][literalLineIndices],
-  #                           joined_stats[,title_comp][literalLineIndices], f=3)),
-  #                           col = "black", lty = 5, lwd = 3)
-  #     sentimentalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="sentimental"),
-  #                                                    which(joined_stats[,title] > 0),
-  #                                                    which(joined_stats[,title_comp] > 0)))
-  #     lines(lowess(data.frame(joined_stats[,title][sentimentalLineIndices],
-  #                           joined_stats[,title_comp][sentimentalLineIndices], f=3)),
-  #                           col = "black", lty=3, lwd = 3)
-  #     legendLevels <- levels(factor(joined_stats$mode))
-  #     legendLevels[1] <- sprintf("%s, r = %.2f",legendLevels[1],c_literal$estimate)
-  #     legendLevels[2] <- sprintf("%s, r = %.2f",legendLevels[2],c_sentimental$estimate)
-  # 
-  #     legend("topleft",
-  #     legend = legendLevels,
-  #     pch = c(NA,NA),
-  #     cex=1.5,
-  #     col = "black",
-  #     lty = c(5,3),
-  #     lwd = 3)
-  #   }
 }
 # Special treatment for timings since we've recorded them independent of the description mode.
-png("plots/timeTaken.png", 650, 650, type = 'cairo')
+png("plots/timeTaken.png", 1000, 1000, type = 'cairo')
 par(mar=plotMargins) 
 boxplot(round(literal_stats$timeTaken,1),
     main = "timeTaken",
@@ -269,7 +261,7 @@ boxplot(round(literal_stats$timeTaken,1),
     cex.axis = axisLabelSize,
     cex.main = titleSize,
     cex.lab = labelSize)
-  text(x=1.25, y=fivenum(round(literal_stats$timeTaken,1)),labels=fivenum(round(literal_stats$timeTaken,1)), font=2)
+  text(x=1.25, y=fivenum(round(literal_stats$timeTaken,1)),labels=fivenum(round(literal_stats$timeTaken,1)), font=2, cex = 0.8 * axisLabelSize)
 dev.off()
 
 colnames(t_tests)=all_columns
@@ -287,6 +279,9 @@ annotators$firstLanguage<-replace(annotators$firstLanguage, annotators$firstLang
 annotators$nationality<-replace(annotators$nationality, annotators$nationality%in%c("de","deutsch","Deutsch"), "DE")
 annotators$nationality<-replace(annotators$nationality, annotators$nationality=="Israelisch", "IL")
 annotators$nationality<-replace(annotators$nationality, annotators$nationality=="Ã–sterreichisch", "AT")
+
+annotators$lineOfWork<-replace(annotators$lineOfWork, annotators$lineOfWork=="it", "IT")
+
 
 for (title in annotator_vars_numeric){
   column <- annotators[,title]
@@ -320,8 +315,8 @@ for (title in annotator_vars_nonNumeric){
     las=2,
     main = title,
     col = barPal,
-    bg=barPal,
-    bord=NA,
+    bg= barPal,
+    bord=barPalBord,
     xlim = c(0, max),
     cex.axis = 2.5,
     cex.lab = 2.5,
@@ -435,9 +430,9 @@ boxplot(round(models$autoTags_P,2) ~ models$category,
     ylab=NA,
     las = 2,
     xaxt = "n",
-    col = coul,
-    bg=coul,
-    border = bord,
+    col = coul_16,
+    bg = coul_16,
+    border = coul_16_Bord,
     cex.axis = 2.0,
     cex.main = 3)
 axis(1, at = seq(0, 1,  1/10), cex.axis = 2.0)
@@ -456,9 +451,9 @@ boxplot(round(models$autoTags_R,2) ~ models$category,
     ylab=NA,
     las = 2,
     xaxt = "n",
-    col = coul,
-    bg=coul,
-    border = bord,
+    col = coul_16,
+    bg= coul_16,
+    border = coul_16_Bord,
     cex.axis = 2.0,
     cex.main = 3)
 
@@ -478,9 +473,9 @@ boxplot(round(models$autoTags_F1,2) ~ models$category,
     ylab=NA,
     las = 2,
     xaxt = "n",
-    col = coul,
-    bg=coul,
-    border = bord,
+    col = coul_16,
+    bg= coul_16,
+    border = coul_16_Bord,
     cex.axis = 2.0,
     cex.main = 3)
 
