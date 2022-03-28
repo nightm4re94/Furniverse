@@ -2,7 +2,7 @@
 title: "R Notebook"
 output: html_notebook
 ---
-
+First, we read the descriptions, stats, and annotators data.
 ```{r}
 descriptions <- read.table("descriptions.csv", sep = '\t', header= TRUE, encoding = "utf-8")
 literal_stats <- read.table("literal_stats.csv", sep = '\t', header= TRUE)[1:31]
@@ -11,14 +11,37 @@ annotators <- read.table("annotators.csv", sep = '\t', header= TRUE, encoding = 
 
 ```
 
+Next, we define plot color spaces and sizes.
 ```{r}
 library(colorspace)
 coul <- c("#FFC20A","#0C7BDC","#A72608","#134611")
 fill <- adjustcolor(coul,alpha=0.8)
-bord <- sapply(coul, darken)
+bord <- sapply(sapply(coul, darken), darken)
 library(RColorBrewer)
 barPal <- brewer.pal(9,"Set1")
+coul_15 <- c("#000000",
+             "#252525",
+             "#676767",
+             "#171723",
+             "#004949",
+             "#009999",
+             "#22cf22",
+             "#490092",
+             "#006ddb",
+             "#b66dff",
+             "#ff6db6",
+             "#920000",
+             "#8f4e00",
+             "#db6d00",
+             "#ffdf4d")
+
+titleSize <- 2.5
+axisLabelSize <- 2.0
+labelSize <- 2.0
+plotMargins <- c(6,6,4,2) + 0.1
 ```
+
+This section pretransforms our dataframes and assigns column names
 
 ```{r}
 stat_columns = c("variable","t","p_t-test","c","p_correlation") 
@@ -40,9 +63,6 @@ modes = c("literal","sentimental")
 
 all_columns <- append(stat_columns,c(literal_names,sentimental_names,summary_names),1)
 
-t_tests <- data.frame(matrix(nrow=0, ncol = length(all_columns)))
-t_tests_comp <- data.frame(matrix(nrow=0, ncol = 6))
-
 annotator_vars <- names(annotators)[4:15]
 annotator_vars_numeric <- names(annotators)[c(4,11,12,13)]
 annotator_vars_nonNumeric <- names(annotators)[c(5,6,7,8,9,10,14,15)]
@@ -57,8 +77,8 @@ sentimental_stats$annotator <- descriptions$annotator[descriptions$X_id==sentime
 
 library(lubridate, warn.conflicts = FALSE)
 
-literal_stats$timeTaken <- as.duration(hms(descriptions$timeTaken[descriptions$X_id==literal_stats$X_id]))
-sentimental_stats$timeTaken <- as.duration(hms(descriptions$timeTaken[descriptions$X_id==sentimental_stats$X_id]))
+literal_stats$timeTaken <- as.numeric(as.duration(hms(descriptions$timeTaken[descriptions$X_id==literal_stats$X_id])))
+sentimental_stats$timeTaken <- as.numeric(as.duration(hms(descriptions$timeTaken[descriptions$X_id==sentimental_stats$X_id])))
 
 # Set description times over 10 minutes to the mean description time
 literal_stats$timeTaken[literal_stats$timeTaken>600] <- mean(literal_stats$timeTaken[literal_stats$timeTaken<=600])
@@ -77,6 +97,28 @@ mode_colors  <-  ifelse(joined_stats$mode == "literal", coul[1], coul[2])
 mode_shapes  <-  ifelse(joined_stats$mode == "literal", 15, 19)
 ```
 
+```{r}
+modePanel <- function (x, y, col = par("col"), bg = NA, pch = par("pch"), 
+    cex = 1, col.smooth = 2, span = 2/3, iter = 3, ...) 
+{
+    points(x, y, pch = pch, col = col, bg = bg, cex = cex)
+    ok <- is.finite(x) & is.finite(y)
+    
+    # Plot smoothing lines if there is at least a weak correlation (r>0.3)
+    if((abs(c_literal$estimate)>0.3)||(abs(c_literal$estimate)>0.3)){
+      literalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="literal"), which(ok)))
+      lines(lowess(data.frame(x[literalLineIndices],
+                            y[literalLineIndices], f=3)),
+                            col = "black", lty = 5, lwd = 3)
+      sentimentalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="sentimental"), which(ok)))
+      lines(lowess(data.frame(x[sentimentalLineIndices],
+                            y[sentimentalLineIndices], f=3)),
+                            col = "black", lty=3, lwd = 3)
+    }
+}
+```
+
+
 Assumptions for pearson's correlation, inspired by Cohen(1988):
 
 |correlation coefficient value|strength of correlation|
@@ -86,6 +128,8 @@ Assumptions for pearson's correlation, inspired by Cohen(1988):
 |0.7 < \| r \| <= 1           |strong                 |
 
 ```{r}
+t_tests <- data.frame(matrix(nrow=0, ncol = length(all_columns)))
+t_tests_comp <- data.frame(matrix(nrow=0, ncol = 6))
 
 for (title in description_vars){
   literalVariableName <- sprintf("%s_literal", title)
@@ -93,8 +137,9 @@ for (title in description_vars){
   literalColumn <- literal_stats[,title]
   sentimentalColumn <- sentimental_stats[,title]
 
-  if(!title %in% annotator_vars_numeric){
-  png(sprintf("plots/%s.png",title), 800, 800, type = 'cairo')
+  if(!title %in% annotator_vars_numeric&&title!="timeTaken"){
+  png(sprintf("plots/%s.png",title), 900, 800, type = 'cairo')
+  par(mar=plotMargins) 
   boxplot(round(literalColumn,2), round(sentimentalColumn, 2),
     main = sprintf("%s, literal vs. sentimental descriptions", title),
     names = c("literal","sentimental"),
@@ -104,9 +149,9 @@ for (title in description_vars){
     bg=coul,
     pch=21,
     border = bord,
-    cex.axis = 1.5,
-    cex.main = 1.5,
-    cex.lab = 1.5)
+    cex.axis = axisLabelSize,
+    cex.main = titleSize,
+    cex.lab = labelSize)
   text(x=1.5, y=fivenum(round(literalColumn,2)),labels=fivenum(round(literalColumn,2)), font=2)
   text(x=2.5, y=fivenum(round(sentimentalColumn, 2)),labels=fivenum(round(sentimentalColumn, 2)), font=2)
   dev.off()
@@ -125,6 +170,7 @@ for (title in description_vars){
   names(stat_vector)  <-  all_columns
 
   t_tests <- rbind(t_tests, stat_vector)
+  
   }
   for (title_comp in description_vars){
     if (title == title_comp) {
@@ -141,59 +187,91 @@ for (title in description_vars){
                          t_literal$statistic, t_literal$p.value, c_literal$estimate, c_literal$p.value,
                          t_sentimental$statistic, t_sentimental$p.value, c_sentimental$estimate, c_sentimental$p.value)
     names(stat_vector_comp) <- stat_columns_comp
+    
     t_tests_comp <- rbind(t_tests_comp, stat_vector_comp)
+    colnames(t_tests_comp) <- stat_columns_comp
 
-    png(sprintf("plots/%s_vs_%s.png",title,title_comp), 800, 800, type = 'cairo')
-    plot(data.frame(joined_stats[title],joined_stats[title_comp]),
+    if(any(t_tests_comp$variable == title_comp & t_tests_comp$variable_comp == title)){
+      next
+    }    
+    png(sprintf("plots/%s_vs_%s.png",title,title_comp), 900, 800, type = 'cairo')
+    par(mar=plotMargins) 
+    pairs(data.frame(joined_stats[title],joined_stats[title_comp]),
     main = sprintf("%s vs. %s", title, title_comp),
-    xlab = title,
-    ylab = title_comp,
     col = mode_colors,
     pch=mode_shapes,
     cex=1.5,
-    cex.axis = 1.5,
-    cex.main = 1.5,
-    cex.lab = 1.5)
-  
-
- 
-  # Plot smoothing lines if there is at least a weak correlation (r>0.3)
+    cex.axis = axisLabelSize,
+    cex.main = titleSize,
+    cex.lab = labelSize, 
+    panel = modePanel)
+    par(xpd = T, mar = par()$mar + c(0,0,0,7))
+    
     if((abs(c_literal$estimate)>0.3)||(abs(c_literal$estimate)>0.3)){
-      literalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="literal"),
-                                                which(joined_stats[,title] > 0),
-                                                which(joined_stats[,title_comp] > 0)))
-      lines(lowess(data.frame(joined_stats[,title][literalLineIndices],
-                            joined_stats[,title_comp][literalLineIndices], f=3)), 
-                            col = "black", lty = 5, lwd = 3)
-      sentimentalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="sentimental"),
-                                                     which(joined_stats[,title] > 0),
-                                                     which(joined_stats[,title_comp] > 0)))
-      lines(lowess(data.frame(joined_stats[,title][sentimentalLineIndices],
-                            joined_stats[,title_comp][sentimentalLineIndices], f=3)), 
-                            col = "black", lty=3, lwd = 3)
       legendLevels <- levels(factor(joined_stats$mode))
       legendLevels[1] <- sprintf("%s, r = %.2f",legendLevels[1],c_literal$estimate)
       legendLevels[2] <- sprintf("%s, r = %.2f",legendLevels[2],c_sentimental$estimate)
-      
-      legend("topleft",
+
+      legend("center",
       legend = legendLevels,
-      pch = c(NA,NA),
+      pch = c(15,19),
       cex=1.5,
-      col = "black",
+      col = c(coul[1], coul[2]),
       lty = c(5,3),
       lwd = 3)
+    }else{
+      legend("center",
+      legend = levels(factor(joined_stats$mode)),
+      pch = c(15,19),
+      cex=1.5,
+      col = c(coul[1], coul[2]))
     }
-  
-  legend("topright",
-       legend = levels(factor(joined_stats$mode)),
-       pch = c(15,19),
-       cex=1.5,
-       col = c(coul[1], coul[2]))
-  
-  dev.off()
+    dev.off()
   }
 
+
+  # # Plot smoothing lines if there is at least a weak correlation (r>0.3)
+  #   if((abs(c_literal$estimate)>0.3)||(abs(c_literal$estimate)>0.3)){
+  #     literalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="literal"),
+  #                                               which(joined_stats[,title] > 0),
+  #                                               which(joined_stats[,title_comp] > 0)))
+  #     lines(lowess(data.frame(joined_stats[,title][literalLineIndices],
+  #                           joined_stats[,title_comp][literalLineIndices], f=3)),
+  #                           col = "black", lty = 5, lwd = 3)
+  #     sentimentalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="sentimental"),
+  #                                                    which(joined_stats[,title] > 0),
+  #                                                    which(joined_stats[,title_comp] > 0)))
+  #     lines(lowess(data.frame(joined_stats[,title][sentimentalLineIndices],
+  #                           joined_stats[,title_comp][sentimentalLineIndices], f=3)),
+  #                           col = "black", lty=3, lwd = 3)
+  #     legendLevels <- levels(factor(joined_stats$mode))
+  #     legendLevels[1] <- sprintf("%s, r = %.2f",legendLevels[1],c_literal$estimate)
+  #     legendLevels[2] <- sprintf("%s, r = %.2f",legendLevels[2],c_sentimental$estimate)
+  # 
+  #     legend("topleft",
+  #     legend = legendLevels,
+  #     pch = c(NA,NA),
+  #     cex=1.5,
+  #     col = "black",
+  #     lty = c(5,3),
+  #     lwd = 3)
+  #   }
 }
+# Special treatment for timings since we've recorded them independent of the description mode.
+png("plots/timeTaken.png", 650, 650, type = 'cairo')
+par(mar=plotMargins) 
+boxplot(round(literal_stats$timeTaken,1),
+    main = "timeTaken",
+    ylab = "timeTaken (seconds)",
+    col = coul,
+    bg=coul,
+    border = bord,
+    cex.axis = axisLabelSize,
+    cex.main = titleSize,
+    cex.lab = labelSize)
+  text(x=1.25, y=fivenum(round(literal_stats$timeTaken,1)),labels=fivenum(round(literal_stats$timeTaken,1)), font=2)
+dev.off()
+
 colnames(t_tests)=all_columns
 colnames(t_tests_comp) <- stat_columns_comp
 write.csv(t_tests,"surfaceStats.csv", row.names=FALSE)
@@ -228,7 +306,6 @@ for (title in annotator_vars_numeric){
   dev.off()
   summary <- summary(column)
   annotator_stats <- rbind(annotator_stats, summary)
-  # write.csv(summary,"annotatorStats.csv", row.names=FALSE)
 }
 
 library("plyr")
@@ -255,6 +332,205 @@ for (title in annotator_vars_nonNumeric){
   axis(1, at = seq(0, max,  5), lwd=3, cex.axis = 2.0)
   par(mar=c(5,4,4,2) + 0.1) # Restore default spacing
   dev.off()
-
 }
 ```
+
+Next, we're evaluating the automatic tag generation:
+```{r}
+library(readr)
+models <- read_delim("models.csv", delim = "\t", escape_double = FALSE, trim_ws = TRUE, show_col_types = FALSE)
+models$autoTags <- strsplit(models$autoTags, ",")
+models$tags <- strsplit(models$tags, ",")
+models[c("autoTags_TP","autoTags_FP","autoTags_FN","autoTags_TN",
+         "autoTags_total","autoTags_accuracy",
+         "autoTags_P","autoTags_R","autoTags_F1")] <- 0
+for(i in 1:nrow(models)){
+  cat <- models[i, ]$category
+  autoTags <- unlist(models[i, ]$autoTags)
+  autoTags <- data.frame(t(sapply(strsplit(autoTags, ":"),c)))
+  names(autoTags) <- c("tag","conf")
+  
+  autoTags$conf <- as.numeric(autoTags$conf)
+  autoTags <- autoTags[autoTags$conf>10,]
+  tags <- unlist(models[i, ]$tags)
+  # True Positives: predicted tags that are in the manual tag list, equal to the category name, or have above 90% confidence.
+  models[i,]$autoTags_TP <- length(which(autoTags$tag%in%tags | autoTags$tag==cat | autoTags$conf>=90))
+  # False Positives: predicted tags that are not in the manual tag list, inequal to the category name, and have between 80% and 90% confidence.
+  models[i,]$autoTags_FP <- length(which(!autoTags$tag%in%tags & autoTags$tag!=cat & autoTags$conf<90 & autoTags$conf >=80))
+  # False Negatives: manual tags and category names that are not in the predicted tag list.
+  models[i,]$autoTags_FN <- length(which(c(!tags%in%autoTags$tag, !cat%in%autoTags$tag)))
+  # True Negatives: predicted tags that are not in the manual tag list, inequal to the category name, and have below 50% confidence. 
+  models[i,]$autoTags_TN <- length(which(!autoTags$tag%in%tags & autoTags$tag!=cat & autoTags$conf<50))
+  models[i,]$autoTags_total <- models[i,]$autoTags_TP+models[i,]$autoTags_FP+models[i,]$autoTags_FN+models[i,]$autoTags_TN
+  models[i,]$autoTags_accuracy <- (models[i,]$autoTags_TP+models[i,]$autoTags_TN)/models[i,]$autoTags_total
+  models[i,]$autoTags_P <- models[i,]$autoTags_TP / (models[i,]$autoTags_TP + models[i,]$autoTags_FP)
+  models[i,]$autoTags_R <- models[i,]$autoTags_TP / (models[i,]$autoTags_TP + models[i,]$autoTags_FN)
+  models[i,]$autoTags_F1 <- 2 * models[i,]$autoTags_P * models[i,]$autoTags_R / (models[i,]$autoTags_P + models[i,]$autoTags_R)
+}
+
+tp_total <- sum(models$autoTags_TP)
+fp_total <- sum(models$autoTags_FP)
+fn_total <- sum(models$autoTags_FN)
+tn_total <- sum(models$autoTags_TN)
+total <- sum(models$autoTags_total)
+accuracy_total <- (tp_total+tn_total) / total
+p_total <- tp_total / (tp_total + fp_total)
+r_total <- tp_total / (tp_total + fn_total)
+f1_total <- 2 * p_total * r_total / (p_total + r_total)
+
+
+# Plot accuracy / F1 distributions over all categories
+png(sprintf("plots/autoTags_accuracy_vs_F1.png",title), 800, 800, type = 'cairo')
+boxplot(round(models$autoTags_accuracy,2), round(models$autoTags_F1, 2),
+    main = "autoTags, accuracy vs. F1-score",
+    names = c("accuracy","F1-score"),
+    ylim = c(0,1),
+    col = coul,
+    bg=coul,
+    pch=21,
+    border = bord,
+    cex.axis = 1.5,
+    cex.main = 1.5,
+    cex.lab = 1.5)
+  text(x=1.5, y=fivenum(round(models$autoTags_accuracy,2)),labels=fivenum(round(models$autoTags_accuracy,2)), font=2)
+  text(x=2.5, y=fivenum(round(models$autoTags_F1, 2)),labels=fivenum(round(models$autoTags_F1, 2)), font=2)
+  dev.off()
+
+# Plot Precision / Recall distribution over all categories 
+png(sprintf("plots/autoTags_precision_vs_recall.png",title), 1000, 1000, type = 'cairo')
+par(mar=c(5,6,4,2) + 0.1)
+plot(round(models$autoTags_P,2), round(models$autoTags_R, 2),
+    main = "autoTags, precision vs. recall",
+    names = c("P","R"),
+    xlab = "P",
+    ylab = "R",
+    xlim = c(0,1),
+    ylim = c(0,1),
+    col=factor(models$category),
+    pch = c(15,17,19),
+    cex.axis = 2.5,
+    cex.main = 3,
+    cex.lab = 2.5,
+    cex=2)
+
+lines(lowess(data.frame(models$autoTags_P, models$autoTags_R, f=2)), col = "black", lty = 5, lwd = 3)
+
+legend("bottomright",
+       legend = levels(factor(models$category)),
+       pch = c(15,17,19),
+       cex=2,
+       col=factor(levels(factor(models$category))))
+par(mar=c(5,4,4,2) + 0.1)
+dev.off() 
+
+
+# Plot Precision distribution by category 
+png(sprintf("plots/autoTags_precision_vs_category.png",title), 1000, 1000, type = 'cairo')
+par(mar=c(8,15,4,2) + 0.1)
+boxplot(round(models$autoTags_P,2) ~ models$category,
+    main = "autoTags, precision by category",
+    horizontal = TRUE,
+    ylim=c(0,1),
+    xlab=NA,
+    ylab=NA,
+    las = 2,
+    xaxt = "n",
+    col = coul,
+    bg=coul,
+    border = bord,
+    cex.axis = 2.0,
+    cex.main = 3)
+axis(1, at = seq(0, 1,  1/10), cex.axis = 2.0)
+grid(ny=NA, col = adjustcolor("black", alpha=0.3), lty = 2, lwd = 1)
+title(xlab = "Precision", cex.lab = 2, line = 4.5)
+dev.off()
+
+# Plot Recall distribution by category 
+png(sprintf("plots/autoTags_recall_vs_category.png",title), 1000, 1000, type = 'cairo')
+par(mar=c(8,15,4,2) + 0.1)
+boxplot(round(models$autoTags_R,2) ~ models$category,
+    main = "autoTags, recall by category",
+    horizontal = TRUE,
+    ylim=c(0,1),
+    xlab=NA,
+    ylab=NA,
+    las = 2,
+    xaxt = "n",
+    col = coul,
+    bg=coul,
+    border = bord,
+    cex.axis = 2.0,
+    cex.main = 3)
+
+axis(1, at = seq(0, 1,  1/10), cex.axis = 2.0)
+grid(ny=NA, col = adjustcolor("black", alpha=0.3), lty = 2, lwd = 1)
+title(xlab = "Recall", cex.lab = 2, line = 4.5)
+dev.off()
+
+# Plot F1 distribution by category 
+png(sprintf("plots/autoTags_f1_vs_category.png",title), 1000, 1000, type = 'cairo')
+par(mar=c(8,15,4,2) + 0.1)
+boxplot(round(models$autoTags_F1,2) ~ models$category,
+    main = "autoTags, F1-score by category",
+    horizontal = TRUE,
+    ylim=c(0,1),
+    xlab=NA,
+    ylab=NA,
+    las = 2,
+    xaxt = "n",
+    col = coul,
+    bg=coul,
+    border = bord,
+    cex.axis = 2.0,
+    cex.main = 3)
+
+axis(1, at = seq(0, 1,  1/10), cex.axis = 2.0)
+grid(ny=NA, col = adjustcolor("black", alpha=0.3), lty = 2, lwd = 1)
+title(xlab = "F1-score", cex.lab = 2, line = 4.5)
+dev.off()
+
+cols <- c("cat1", "cat2", 
+          "precision_mean_cat1", "precision_mean_cat2",
+          "recall_mean_cat1", "recall_mean_cat2",
+          "f1_mean_cat1", "f1_mean_cat2",
+          "precision_t", "precision_p(t)",
+          "recall_t", "recall_p(t)",
+          "f1_t", "f1_p(t)")
+t_tests <- data.frame(matrix(nrow=0, ncol = length(cols)))
+names(t_tests) <- cols
+
+for(i in 1:length(levels(factor(models$category)))){
+  var <- levels(factor(models$category))[i]
+  other_vars <- levels(factor(models$category))[-i]
+  for(j in 1: length(other_vars)){
+    other_var <- other_vars[j]
+    cat1 <- models$category==var
+    cat2 <- models$category==other_var
+    precision_mean1 <-  mean(models$autoTags_P[cat1])
+    precision_mean2 <-  mean(models$autoTags_P[cat2])
+    precision_t <- t.test(models$autoTags_P[cat1], models$autoTags_P[cat2])
+
+    recall_mean1 <-  mean(models$autoTags_R[cat1])
+    recall_mean2 <-  mean(models$autoTags_R[cat2])
+    recall_t <- t.test(models$autoTags_R[cat1], models$autoTags_R[cat2])
+
+    f1_mean1 <-  mean(models$autoTags_F1[cat1])
+    f1_mean2 <-  mean(models$autoTags_F1[cat2])
+    f1_t <- t.test(models$autoTags_F1[cat1], models$autoTags_F1[cat2])
+
+    stat_vector = c(var, other_var,
+                    precision_mean1, precision_mean2,
+                    precision_t$statistic, precision_t$p.value,
+                    recall_mean1, recall_mean2,
+                    recall_t$statistic, recall_t$p.value,
+                    f1_mean1, f1_mean2,
+                    f1_t$statistic, f1_t$p.value)
+    names(stat_vector)  <-  cols
+    t_tests <- rbind(t_tests, stat_vector)
+  }
+}
+names(t_tests) <- cols
+write.csv(t_tests,"autoTagsEvaluation.csv", row.names=FALSE)
+
+```
+
