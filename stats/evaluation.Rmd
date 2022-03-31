@@ -72,8 +72,8 @@ annotator_vars <- names(annotators)[4:15]
 annotator_vars_numeric <- names(annotators)[c(4,11,12,13)]
 annotator_vars_nonNumeric <- names(annotators)[c(5,6,7,8,9,10,14,15)]
 annotator_stats <- data.frame()
-description_vars <- c(names(literal_stats)[3:31], 
-                      "spelling_errors", 
+description_vars <- c("spelling_errors",
+                      "sentiment",
                       names(literal_stats)[3:31], 
                       annotator_vars_numeric, 
                       names(descriptions)[8])
@@ -95,6 +95,9 @@ sentimental_stats$timeTaken[sentimental_stats$timeTaken>600] <- mean(sentimental
 
 literal_stats$spelling_errors <- descriptions$literal_spelling_errors[descriptions$X_id==literal_stats$X_id]
 sentimental_stats$spelling_errors <- descriptions$sentimental_spelling_errors[descriptions$X_id==sentimental_stats$X_id]
+
+literal_stats$sentiment <- descriptions$literal_sentiment[descriptions$X_id==literal_stats$X_id]
+sentimental_stats$sentiment <- descriptions$sentimental_sentiment[descriptions$X_id==sentimental_stats$X_id]
 
 for (annotator_var in annotator_vars){
   literal_stats[annotator_var] <- annotators[,annotator_var][match(literal_stats$annotator,annotators$X_id)]
