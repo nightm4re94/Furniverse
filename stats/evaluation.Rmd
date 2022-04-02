@@ -2,12 +2,13 @@
 title: "R Notebook"
 output: html_notebook
 ---
-First, we read the descriptions, stats, and annotators data.
+First, we read the descriptions, stats, annotators, and embeddings data.
 ```{r}
 descriptions <- read.table("descriptions.csv", sep = '\t', header= TRUE, encoding = "utf-8")
 literal_stats <- read.table("literal_stats.csv", sep = '\t', header= TRUE)[1:31]
 sentimental_stats <- read.table("sentimental_stats.csv", sep = '\t', header= TRUE)[1:31]
 annotators <- read.table("annotators.csv", sep = '\t', header= TRUE, encoding = "utf-8")
+embeddings <- read.table("embeddings.csv", sep = '\t', header= TRUE, encoding = "utf-8", row.names = 1)
 
 ```
 
@@ -384,7 +385,7 @@ f1_total <- 2 * p_total * r_total / (p_total + r_total)
 
 
 # Plot accuracy / F1 distributions over all categories
-png(sprintf("plots/autoTags_accuracy_vs_F1.png",title), 800, 800, type = 'cairo')
+png("plots/autoTags_accuracy_vs_F1.png", 800, 800, type = 'cairo')
 boxplot(round(models$autoTags_accuracy,2), round(models$autoTags_F1, 2),
     main = "autoTags, accuracy vs. F1-score",
     names = c("accuracy","F1-score"),
@@ -401,7 +402,7 @@ boxplot(round(models$autoTags_accuracy,2), round(models$autoTags_F1, 2),
   dev.off()
 
 # Plot Precision / Recall distribution over all categories 
-png(sprintf("plots/autoTags_precision_vs_recall.png",title), 1000, 1000, type = 'cairo')
+png("plots/autoTags_precision_vs_recall.png", 1000, 1000, type = 'cairo')
 par(mar=c(5,6,4,2) + 0.1)
 plot(round(models$autoTags_P,2), round(models$autoTags_R, 2),
     main = "autoTags, precision vs. recall",
@@ -429,7 +430,7 @@ dev.off()
 
 
 # Plot Precision distribution by category 
-png(sprintf("plots/autoTags_precision_vs_category.png",title), 1000, 1000, type = 'cairo')
+png("plots/autoTags_precision_vs_category.png", 1000, 1000, type = 'cairo')
 par(mar=c(8,15,4,2) + 0.1)
 boxplot(round(models$autoTags_P,2) ~ models$category,
     main = "autoTags, precision by category",
@@ -450,7 +451,7 @@ title(xlab = "Precision", cex.lab = 2, line = 4.5)
 dev.off()
 
 # Plot Recall distribution by category 
-png(sprintf("plots/autoTags_recall_vs_category.png",title), 1000, 1000, type = 'cairo')
+png("plots/autoTags_recall_vs_category.png", 1000, 1000, type = 'cairo')
 par(mar=c(8,15,4,2) + 0.1)
 boxplot(round(models$autoTags_R,2) ~ models$category,
     main = "autoTags, recall by category",
@@ -472,7 +473,7 @@ title(xlab = "Recall", cex.lab = 2, line = 4.5)
 dev.off()
 
 # Plot F1 distribution by category 
-png(sprintf("plots/autoTags_f1_vs_category.png",title), 1000, 1000, type = 'cairo')
+png("plots/autoTags_f1_vs_category.png", 1000, 1000, type = 'cairo')
 par(mar=c(8,15,4,2) + 0.1)
 boxplot(round(models$autoTags_F1,2) ~ models$category,
     main = "autoTags, F1-score by category",
@@ -535,6 +536,82 @@ for(i in 1:length(levels(factor(models$category)))){
 }
 names(t_tests) <- cols
 write.csv(t_tests,"autoTagsEvaluation.csv", row.names=FALSE)
+
+```
+```{r}
+library(magrittr)
+library(dplyr)
+library(ggpubr)
+
+category_embeddings <- embeddings[endsWith(rownames(embeddings), "category"),]
+categories <- c("bed", "bench", "cabinet", "chair", "chest", "couch", "decoration", "desk", "diningtable", "electronics", "hobby", "shelf", "stool", "tableware", "wardrobe")
+
+dim_names <- c("Dim.1", "Dim.2")
+
+image_embeddings <- embeddings[endsWith(rownames(embeddings), ".png"),]
+literal_embeddings <- embeddings[grepl("literal",rownames(embeddings), fixed = TRUE),]
+sentimental_embeddings <- embeddings[grepl("sentimental",rownames(embeddings), fixed = TRUE),]
+  
+total_mds <- embeddings %>%  dist() %>%  cmdscale() %>%  as_tibble()
+colnames(total_mds) <- dim_names
+
+# Conduct Multidimensional Scaling (MDS)
+category_mds <- category_embeddings %>%  dist() %>%  cmdscale() %>%  as_tibble()
+colnames(category_mds) <- dim_names
+
+image_mds <- image_embeddings %>%  dist() %>%  cmdscale() %>%  as_tibble()
+colnames(image_mds) <- dim_names
+
+literal_mds <- literal_embeddings %>%  dist() %>%  cmdscale() %>%  as_tibble()
+colnames(literal_mds) <- dim_names
+
+sentimental_mds <- sentimental_embeddings %>%  dist() %>%  cmdscale() %>%  as_tibble()
+colnames(sentimental_mds) <- dim_names
+```
+
+```{r}
+# K-means clustering
+total_clust <- kmeans(total_mds, length(categories))$cluster %>% as.factor()
+total_mds <- total_mds %>% mutate(groups = total_clust)
+
+category_mds <- category_mds %>% mutate(groups = 1:length(categories))
+
+image_clust <- kmeans(image_mds, length(categories))$cluster %>% as.factor()
+image_mds <- image_mds %>% mutate(groups = image_clust)
+
+literal_clust <- kmeans(literal_mds, length(categories))$cluster %>% as.factor()
+literal_mds <- literal_mds %>% mutate(groups = literal_clust)
+
+sentimental_clust <- kmeans(sentimental_mds, length(categories))$cluster %>% as.factor()
+sentimental_mds <- sentimental_mds %>% mutate(groups = sentimental_clust)
+
+
+# ggscatter(total_mds, x = "Dim.1", y = "Dim.2",
+#         label = rownames(embeddings),
+#         color = "groups",
+#         palette = coul_16,
+#         size = 1,
+#         ellipse = TRUE,
+#         ellipse.type = "convex",
+#         repel = TRUE)
+
+plot(total_mds, col = total_clust)
+# for(cat in categories){
+#   for (i in 1:15){
+#   id = sprintf("%s-%d", cat, i)
+#   furnishing_embeddings <- embeddings[startsWith(rownames(embeddings), id),]
+#   image_embeddings <- furnishing_embeddings[endsWith(rownames(furnishing_embeddings), ".png"),]
+#   literal_embeddings <- furnishing_embeddings[grepl("literal",rownames(furnishing_embeddings), fixed = TRUE),]
+#   sentimental_embeddings <- furnishing_embeddings[grepl("sentimental",rownames(furnishing_embeddings), fixed = TRUE),]
+#   
+#   
+# 
+#   # image_pca <- prcomp(image_embeddings, center = TRUE, scale. = TRUE)
+#   # literal_pca <- prcomp(literal_embeddings, center = TRUE, scale. = TRUE)
+#   # sentimental_pca <- prcomp(sentimental_embeddings, center = TRUE, scale. = TRUE)
+# 
+#   }
+# }
 
 ```
 
