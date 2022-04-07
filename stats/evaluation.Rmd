@@ -555,7 +555,7 @@ sentimental_embeddings <- embeddings[grepl("sentimental",rownames(embeddings), f
 total_mds <- embeddings %>%  dist() %>%  cmdscale() %>%  as_tibble()
 colnames(total_mds) <- dim_names
 
-# Conduct Multidimensional Scaling (MDS)
+# Apply Multidimensional Scaling (MDS)
 category_mds <- category_embeddings %>%  dist() %>%  cmdscale() %>%  as_tibble()
 colnames(category_mds) <- dim_names
 
@@ -572,46 +572,133 @@ colnames(sentimental_mds) <- dim_names
 ```{r}
 # K-means clustering
 total_clust <- kmeans(total_mds, length(categories))$cluster %>% as.factor()
-total_mds <- total_mds %>% mutate(groups = total_clust)
-
-category_mds <- category_mds %>% mutate(groups = 1:length(categories))
-
+category_clust <- as.factor(categories) # simply translate categories into numbers for clustering, assuming each category is a cluster.
 image_clust <- kmeans(image_mds, length(categories))$cluster %>% as.factor()
-image_mds <- image_mds %>% mutate(groups = image_clust)
-
 literal_clust <- kmeans(literal_mds, length(categories))$cluster %>% as.factor()
-literal_mds <- literal_mds %>% mutate(groups = literal_clust)
-
 sentimental_clust <- kmeans(sentimental_mds, length(categories))$cluster %>% as.factor()
+
+# Group MDS matrices 
+total_mds <- total_mds %>% mutate(groups = total_clust)
+category_mds <- category_mds %>% mutate(groups = 1:length(categories))
+image_mds <- image_mds %>% mutate(groups = image_clust)
+literal_mds <- literal_mds %>% mutate(groups = literal_clust)
 sentimental_mds <- sentimental_mds %>% mutate(groups = sentimental_clust)
 
+```
 
-# ggscatter(total_mds, x = "Dim.1", y = "Dim.2",
-#         label = rownames(embeddings),
-#         color = "groups",
-#         palette = coul_16,
-#         size = 1,
-#         ellipse = TRUE,
-#         ellipse.type = "convex",
-#         repel = TRUE)
+```{r}
+png("plots/clusters_total.png", 1400, 1400, type = 'cairo')
+par(xpd = T, mar=c(8,15,4,10) + 0.1)
 
-plot(total_mds, col = total_clust)
-# for(cat in categories){
-#   for (i in 1:15){
-#   id = sprintf("%s-%d", cat, i)
-#   furnishing_embeddings <- embeddings[startsWith(rownames(embeddings), id),]
-#   image_embeddings <- furnishing_embeddings[endsWith(rownames(furnishing_embeddings), ".png"),]
-#   literal_embeddings <- furnishing_embeddings[grepl("literal",rownames(furnishing_embeddings), fixed = TRUE),]
-#   sentimental_embeddings <- furnishing_embeddings[grepl("sentimental",rownames(furnishing_embeddings), fixed = TRUE),]
-#   
-#   
-# 
-#   # image_pca <- prcomp(image_embeddings, center = TRUE, scale. = TRUE)
-#   # literal_pca <- prcomp(literal_embeddings, center = TRUE, scale. = TRUE)
-#   # sentimental_pca <- prcomp(sentimental_embeddings, center = TRUE, scale. = TRUE)
-# 
-#   }
-# }
+pairs(total_mds, 
+       col = coul_16[total_clust],
+       pch=19,
+       cex=1.5,
+       las=1,
+       cex.axis = axisLabelSize,
+       cex.main = titleSize,
+       cex.labels = labelSize)
+
+points(category_mds, 
+       col = "black",
+       pch=20,
+       cex=1.5,
+       las=1,
+       cex.axis = axisLabelSize,
+       cex.main = titleSize,
+       cex.labels = labelSize)
+
+legend("right",
+    legend = levels(as.factor(categories[total_clust])),
+    pch = 19,
+    cex=legendLabelSize,
+    pt.cex = 3,
+    col = coul_16[total_clust],
+    text.col = "black",
+    text.width = .5)
+par(mar=c(5, 4, 4, 2) + 0.1)
+  dev.off()
 
 ```
+```{r}
+library(lsa)
+# This function assumes the two dataframes to have the same number of rows and identical row names. Therefore, it is tailored towards the difference between literal and sentimental descriptions -don't use this universally.
+semantic_sim <- function(df1, df2){
+  result = data.frame(matrix(ncol = 5, nrow = 0))
+  colnames(result) <- c("category", "model", "description", "cos_sim", "eucl_dist")
+  for(row in 1:nrow(df1)){
+    meta =  strsplit(rownames(literal_embeddings[row, ]), split="_")
+    id  =  strsplit(meta[[1]][1], split="-")
+    result[row,]$category <- id[[1]][1]
+    result[row,]$model <- id[[1]][2]
+    result[row,]$description <- meta[[1]][3]
+    result[row,]$cos_sim <- cosine(as.numeric(df1[row,]), as.numeric(df2[row,]))
+    result[row,]$eucl_dist <- sqrt(sum((as.numeric(df1[row,]) - as.numeric(df2[row,]))^2))
+  }
+  return(result)
+}
+
+sim <- semantic_sim(literal_embeddings, sentimental_embeddings)
+```
+
+```{r}
+png("plots/cosSim_literal_vs_sentimental.png", 1000, 1000, type = 'cairo')
+par(mar=c(18, 12, 12, 4) + 0.1)
+boxplot(sim$cos_sim ~ sim$category,
+        col=coul_16,
+        border=coul_16_Bord,
+        main="cosine similarity \nbetween literal and sentimental descriptions",
+        xlab=NA,
+        ylab=NA,
+        las=2,
+        cex.axis = axisLabelSize,
+        cex.main = titleSize,
+        cex.lab = labelSize)
+
+title(xlab = "furnishing category", cex.lab = labelSize, line = 14)
+title(ylab = "cosine similarity", cex.lab = labelSize, line = 6)
+dev.off()
+
+png("plots/euclDist_literal_vs_sentimental.png", 1000, 1000, type = 'cairo')
+par(mar=c(18, 12, 12, 4) + 0.1)
+boxplot(sim$eucl_dist ~ sim$category,
+        col=coul_16,
+        border=coul_16_Bord,
+        main="euclidean distance \nbetween literal and sentimental descriptions",
+        xlab=NA,
+        ylab=NA,
+        las=2,
+        cex.axis = axisLabelSize,
+        cex.main = titleSize,
+        cex.lab = labelSize)
+
+title(xlab = "furnishing category", cex.lab = labelSize, line = 14)
+title(ylab = "euclidean distance", cex.lab = labelSize, line = 6)
+dev.off()
+```
+```{r}
+cos_stats <- data.frame(matrix(ncol = 7, nrow = 0))
+eucl_stats <- data.frame(matrix(ncol = 7, nrow = 0))
+
+for(cat in categories){
+  sum_cos <- data.frame(as.list(summary(sim$cos_sim[sim$category==cat])))
+  cos_stats <- rbind(cos_stats, sum_cos)
+  
+  sum_eucl <- data.frame(as.list(summary(sim$eucl_dist[sim$category==cat])))
+  eucl_stats <- rbind(eucl_stats, sum_eucl)
+}
+
+sum_total_cos <- data.frame(as.list(summary(sim$cos_sim)))
+cos_stats <- rbind(cos_stats, sum_total_cos)
+
+sum_total_eucl <- data.frame(as.list(summary(sim$eucl_dist)))
+eucl_stats <- rbind(eucl_stats, sum_total_eucl)
+
+rownames(cos_stats) <- c(categories, "total")
+rownames(eucl_stats) <- c(categories, "total")
+
+write.csv(cos_stats,"cosSim_literal_vs_sentimental.csv", row.names=TRUE)
+write.csv(eucl_stats,"euclDist_literal_vs_sentimental.csv", row.names=TRUE)
+```
+
 
