@@ -587,11 +587,19 @@ sentimental_mds <- sentimental_mds %>% mutate(groups = sentimental_clust)
 ```
 
 ```{r}
+clusterPanel <- function (x, y, col = par("col"), bg = NA, pch = par("pch"), 
+    cex = 1, col.smooth = 2, span = 2/3, iter = 3, ...) 
+{
+    points(x, y, pch = pch, col = col, bg = bg, cex = cex, xlab = names(x), ylab = names(y))
+
+}
+```
+
+```{r}
 png("plots/clusters_total.png", 1400, 1400, type = 'cairo')
 par(xpd = T, mar=c(8,15,4,10) + 0.1)
-
-pairs(total_mds, 
-       col = coul_16[total_clust],
+plot(image_mds[,-3], 
+       col = "lightgrey",
        pch=19,
        cex=1.5,
        las=1,
@@ -599,23 +607,45 @@ pairs(total_mds,
        cex.main = titleSize,
        cex.labels = labelSize)
 
-points(category_mds, 
-       col = "black",
-       pch=20,
+points(literal_mds[,-3], 
+       col = coul[2],
+       pch=19,
        cex=1.5,
        las=1,
        cex.axis = axisLabelSize,
        cex.main = titleSize,
        cex.labels = labelSize)
 
-legend("right",
-    legend = levels(as.factor(categories[total_clust])),
-    pch = 19,
-    cex=legendLabelSize,
-    pt.cex = 3,
-    col = coul_16[total_clust],
-    text.col = "black",
-    text.width = .5)
+points(sentimental_mds[,-3], 
+       col = coul[3],
+       pch=19,
+       cex=1.5,
+       las=1,
+       cex.axis = axisLabelSize,
+       cex.main = titleSize,
+       cex.labels = labelSize)
+
+points(category_mds[,-3], 
+       col = "black",
+       bg = "white",
+       lwd = 3,
+       pch=23,
+       cex=4,
+       las=1,
+       cex.axis = axisLabelSize,
+       cex.main = titleSize,
+       cex.labels = labelSize)
+
+text(category_mds[,1], category_mds[,2]+.2, category_mds[,3],cex=labelSize)
+
+# legend("right",
+#     legend = levels(as.factor(categories[total_clust])),
+#     pch = 19,
+#     cex=legendLabelSize,
+#     pt.cex = 3,
+#     col = coul_16[total_clust],
+#     text.col = "black",
+#     text.width = .5)
 par(mar=c(5, 4, 4, 2) + 0.1)
   dev.off()
 
