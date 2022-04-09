@@ -543,30 +543,32 @@ library(magrittr)
 library(dplyr)
 library(ggpubr)
 
-category_embeddings <- embeddings[endsWith(rownames(embeddings), "category"),]
 categories <- c("bed", "bench", "cabinet", "chair", "chest", "couch", "decoration", "desk", "diningtable", "electronics", "hobby", "shelf", "stool", "tableware", "wardrobe")
 
-dim_names <- c("Dim.1", "Dim.2")
+dim_names <- c("Dim.1", "Dim.2", "group")
 
+# Create embeddings subsets
+category_embeddings <- embeddings[endsWith(rownames(embeddings), "category"),]
 image_embeddings <- embeddings[endsWith(rownames(embeddings), ".png"),]
 literal_embeddings <- embeddings[grepl("literal",rownames(embeddings), fixed = TRUE),]
 sentimental_embeddings <- embeddings[grepl("sentimental",rownames(embeddings), fixed = TRUE),]
   
+# Apply Multidimensional Scaling (MDS)
 total_mds <- embeddings %>%  dist() %>%  cmdscale() %>%  as_tibble()
 colnames(total_mds) <- dim_names
+rownames(total_mds) <- rownames(embeddings)
 
-# Apply Multidimensional Scaling (MDS)
-category_mds <- category_embeddings %>%  dist() %>%  cmdscale() %>%  as_tibble()
-colnames(category_mds) <- dim_names
+category_mds <- total_mds[endsWith(rownames(total_mds), "category"),]
+rownames(category_mds) <- rownames(total_mds)[endsWith(rownames(total_mds), "category")]
 
-image_mds <- image_embeddings %>%  dist() %>%  cmdscale() %>%  as_tibble()
-colnames(image_mds) <- dim_names
+image_mds <- total_mds[endsWith(rownames(total_mds), ".png"),]
+rownames(image_mds) <- rownames(total_mds)[endsWith(rownames(total_mds), ".png")]
 
-literal_mds <- literal_embeddings %>%  dist() %>%  cmdscale() %>%  as_tibble()
-colnames(literal_mds) <- dim_names
+literal_mds <- total_mds[grepl("literal",rownames(total_mds), fixed = TRUE),]
+rownames(literal_mds) <- rownames(total_mds)[grepl("literal",rownames(total_mds), fixed = TRUE)]
 
-sentimental_mds <- sentimental_embeddings %>%  dist() %>%  cmdscale() %>%  as_tibble()
-colnames(sentimental_mds) <- dim_names
+sentimental_mds <- total_mds[grepl("sentimental",rownames(total_mds), fixed = TRUE),]
+rownames(sentimental_mds) <- rownames(total_mds)[grepl("sentimental",rownames(total_mds), fixed = TRUE)]
 ```
 
 ```{r}
@@ -598,25 +600,27 @@ clusterPanel <- function (x, y, col = par("col"), bg = NA, pch = par("pch"),
 ```{r}
 png("plots/clusters_total.png", 1400, 1400, type = 'cairo')
 par(xpd = T, mar=c(8,15,4,10) + 0.1)
-plot(image_mds[,-3], 
-       col = "lightgrey",
-       pch=19,
-       cex=1.5,
-       las=1,
-       cex.axis = axisLabelSize,
-       cex.main = titleSize,
-       cex.labels = labelSize)
+# plot(total_mds[,-3], 
+#        col = coul_16[total_clust],
+#        pch=19,
+#        cex=1.5,
+#        las=1,
+#        cex.axis = axisLabelSize,
+#        cex.main = titleSize,
+#        cex.labels = labelSize)
 
-points(literal_mds[,-3], 
+plot(literal_mds[,-3],
        col = coul[2],
        pch=19,
        cex=1.5,
        las=1,
+       xlim=c(-11,-6.5),
+       ylim=c(-1,1),
        cex.axis = axisLabelSize,
        cex.main = titleSize,
        cex.labels = labelSize)
-
-points(sentimental_mds[,-3], 
+# 
+points(sentimental_mds[,-3],
        col = coul[3],
        pch=19,
        cex=1.5,
@@ -650,6 +654,81 @@ par(mar=c(5, 4, 4, 2) + 0.1)
   dev.off()
 
 ```
+```{r}
+desc_embeddings <- rbind(literal_embeddings,sentimental_embeddings)
+
+total_clust <- kmeans(embeddings, 2)
+desc_clust <- kmeans(desc_embeddings, 2)
+image_clust <- kmeans(image_embeddings, 15)
+
+png("plots/clusters_all.png", 1000, 1000, type = 'cairo')
+par(mar=c(14, 10, 8, 4) + 0.1)
+clusplot(embeddings, 
+         total_clust$cluster, 
+         stand = TRUE, 
+         main = "all embeddings, 2 clusters", 
+         lines = 0, 
+         col.p = coul[total_clust$cluster],
+         col.clus = coul[3],
+         las=1,
+         xlab=NA,
+         ylab=NA,
+         cex.axis = axisLabelSize,
+         cex.main = titleSize,
+         cex.lab = labelSize,
+         sub="")
+
+title(xlab = "Component 1", cex.lab = labelSize, line = 6)
+title(xlab = "These two components explain 15.17% of the point variability.", cex.lab = 0.75*labelSize, line = 10)
+title(ylab = "Component 2", cex.lab = labelSize, line = 4)
+dev.off()
+
+png("plots/clusters_image.png", 1000, 1000, type = 'cairo')
+par(mar=c(14, 10, 8, 4) + 0.1)
+clusplot(image_embeddings, 
+         image_clust$cluster, 
+         stand = TRUE, 
+         main = "image embeddings, 15 clusters", 
+         lines = 0, 
+         col.p = coul_16[image_clust$cluster], 
+         col.clus = coul[3],
+         las=1,
+         xlab=NA,
+         ylab=NA,
+         cex.axis = axisLabelSize,
+         cex.main = titleSize,
+         cex.lab = labelSize,
+         sub="")
+
+title(xlab = "Component 1", cex.lab = labelSize, line = 6)
+title(xlab = "These two components explain 12.93% of the point variability.", cex.lab = 0.75*labelSize, line = 10)
+title(ylab = "Component 2", cex.lab = labelSize, line = 4)
+dev.off()
+
+png("plots/clusters_descriptions.png", 1000, 1000, type = 'cairo')
+par(mar=c(14, 10, 8, 4) + 0.1)
+clusplot(desc_embeddings, 
+         desc_clust$cluster, 
+         stand = TRUE, 
+         main = "description embeddings, 2 clusters", 
+         lines = 0, 
+         col.p = coul_16[desc_clust$cluster], 
+         col.clus = coul[3],
+         las=1,
+         xlab=NA,
+         ylab=NA,
+         cex.axis = axisLabelSize,
+         cex.main = titleSize,
+         cex.lab = labelSize,
+         sub="")
+
+title(xlab = "Component 1", cex.lab = labelSize, line = 6)
+title(xlab = "These two components explain 16.26% of the point variability.", cex.lab = 0.75*labelSize, line = 10)
+title(ylab = "Component 2", cex.lab = labelSize, line = 4)
+dev.off()
+
+```
+
 ```{r}
 library(lsa)
 # This function assumes the two dataframes to have the same number of rows and identical row names. Therefore, it is tailored towards the difference between literal and sentimental descriptions -don't use this universally.
