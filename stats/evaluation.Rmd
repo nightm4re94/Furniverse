@@ -1023,7 +1023,7 @@ total_clust <- kmeans(embeddings, 2)
 desc_clust <- kmeans(desc_embeddings, 2)
 image_clust <- kmeans(image_embeddings, 15)
 
-png("plots/clusters_pca_all.png", 1000, 1000, type = 'cairo')
+png("plots/embeddings_pca_all.png", 1000, 1000, type = 'cairo')
 par(mar=c(14, 10, 8, 4) + 0.1)
 clusplot(embeddings, 
          total_clust$cluster, 
@@ -1045,7 +1045,7 @@ title(xlab = "These two components explain 15.17% of the point variability.", ce
 title(ylab = "Component 2", cex.lab = labelSize, line = 4)
 dev.off()
 
-png("plots/clusters_pca_image.png", 1000, 1000, type = 'cairo')
+png("plots/embeddings_pca_image.png", 1000, 1000, type = 'cairo')
 par(mar=c(14, 10, 8, 4) + 0.1)
 clusplot(image_embeddings, 
          image_clust$cluster, 
@@ -1067,7 +1067,7 @@ title(xlab = "These two components explain 12.93% of the point variability.", ce
 title(ylab = "Component 2", cex.lab = labelSize, line = 4)
 dev.off()
 
-png("plots/clusters_pca_descriptions.png", 1000, 1000, type = 'cairo')
+png("plots/embeddings_pca_descriptions.png", 1000, 1000, type = 'cairo')
 par(mar=c(14, 10, 8, 4) + 0.1)
 clusplot(desc_embeddings, 
          desc_clust$cluster, 
