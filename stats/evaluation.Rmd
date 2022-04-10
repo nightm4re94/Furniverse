@@ -22,22 +22,23 @@ library(RColorBrewer)
 barPal <- brewer.pal(12,"Set3")
 barPalBord <- sapply(sapply(barPal, darken), darken)
 
-coul_16 <- c("#2f4f4f",
-             "#8b4513",
-             "#006400",
-             "#bdb76b",
-             "#00008b",
-             "#ff0000",
-             "#00ced1",
-             "#ffa500",
-             "#ffff00",
-             "#00ff00",
-             "#00fa9a",
-             "#0000ff",
-             "#d8bfd8",
-             "#ff00ff",
-             "#1e90ff",
-             "#ff69b4")
+# These 16 colors are taken from https://sashamaps.net/docs/resources/20-colors/, with an accessibility of 99% and excluding black / white.
+coul_16 <- c('#e6194B', 
+             '#3cb44b', 
+             '#ffe119', 
+             '#4363d8', 
+             '#f58231', 
+             '#42d4f4', 
+             '#f032e6', 
+             '#fabed4', 
+             '#469990', 
+             '#dcbeff', 
+             '#9A6324', 
+             '#fffac8', 
+             '#800000', 
+             '#aaffc3', 
+             '#000075', 
+             '#a9a9a9')
 coul_16_Bord <- sapply(sapply(coul_16, darken), darken)
 
 titleSize <- 2.5
@@ -545,71 +546,93 @@ library(ggpubr)
 
 categories <- c("bed", "bench", "cabinet", "chair", "chest", "couch", "decoration", "desk", "diningtable", "electronics", "hobby", "shelf", "stool", "tableware", "wardrobe")
 
-dim_names <- c("Dim.1", "Dim.2", "group")
+dim_names <- c("Dim.1", "Dim.2")
 
 # Create embeddings subsets
 category_embeddings <- embeddings[endsWith(rownames(embeddings), "category"),]
 image_embeddings <- embeddings[endsWith(rownames(embeddings), ".png"),]
 literal_embeddings <- embeddings[grepl("literal",rownames(embeddings), fixed = TRUE),]
 sentimental_embeddings <- embeddings[grepl("sentimental",rownames(embeddings), fixed = TRUE),]
-  
+```
+Compute euclidean distance and cosine dissimilarity matrices, then apply multidimensional scaling. This step takes a few minutes.
+```{r}
+embeddings_dist_eucl <- dist(embeddings)
+
+embeddings_matrix <- as.matrix(embeddings)
+embeddings_sim <- embeddings_matrix / sqrt(rowSums(embeddings_matrix * embeddings_matrix))
+embeddings_sim <- embeddings_sim %*% t(embeddings_sim)
+embeddings_dist_cos <- as.dist(1 - embeddings_sim)
+
 # Apply Multidimensional Scaling (MDS)
-total_mds <- embeddings %>%  dist() %>%  cmdscale() %>%  as_tibble()
-colnames(total_mds) <- dim_names
-rownames(total_mds) <- rownames(embeddings)
+total_mds_eucl <-  as.data.frame(cmdscale(embeddings_dist_eucl))
+total_mds_cos <-  as.data.frame(cmdscale(embeddings_dist_cos))
 
-category_mds <- total_mds[endsWith(rownames(total_mds), "category"),]
-rownames(category_mds) <- rownames(total_mds)[endsWith(rownames(total_mds), "category")]
+colnames(total_mds_eucl) <- dim_names
+colnames(total_mds_cos) <- dim_names
+```
 
-image_mds <- total_mds[endsWith(rownames(total_mds), ".png"),]
-rownames(image_mds) <- rownames(total_mds)[endsWith(rownames(total_mds), ".png")]
 
-literal_mds <- total_mds[grepl("literal",rownames(total_mds), fixed = TRUE),]
-rownames(literal_mds) <- rownames(total_mds)[grepl("literal",rownames(total_mds), fixed = TRUE)]
+```{r}
+total_mds_eucl$category <- sub("-.*", "",sub("_.*", "", rownames(total_mds_eucl)))
+total_mds_eucl$type[endsWith(rownames(total_mds_eucl), "category")] <- "category"
+total_mds_eucl$type[grepl("literal",rownames(total_mds_eucl), fixed = TRUE)] <- "literal"
+total_mds_eucl$type[grepl("sentimental",rownames(total_mds_eucl), fixed = TRUE)] <- "sentimental"
+total_mds_eucl$type[endsWith(rownames(total_mds_eucl), ".png")] <- "image"
 
-sentimental_mds <- total_mds[grepl("sentimental",rownames(total_mds), fixed = TRUE),]
-rownames(sentimental_mds) <- rownames(total_mds)[grepl("sentimental",rownames(total_mds), fixed = TRUE)]
+category_mds_eucl <- total_mds_eucl[total_mds_eucl$type=="category",]
+literal_mds_eucl <- total_mds_eucl[total_mds_eucl$type=="literal",]
+sentimental_mds_eucl <- total_mds_eucl[total_mds_eucl$type=="sentimental",]
+image_mds_eucl <- total_mds_eucl[total_mds_eucl$type=="image",]
+
+
+total_mds_cos$category <- sub("-.*", "",sub("_.*", "", rownames(total_mds_cos)))
+total_mds_cos$type[endsWith(rownames(total_mds_cos), "category")] <- "category"
+total_mds_cos$type[grepl("literal",rownames(total_mds_cos), fixed = TRUE)] <- "literal"
+total_mds_cos$type[grepl("sentimental",rownames(total_mds_cos), fixed = TRUE)] <- "sentimental"
+total_mds_cos$type[endsWith(rownames(total_mds_cos), ".png")] <- "image"
+
+category_mds_cos <- total_mds_cos[total_mds_cos$type=="category",]
+literal_mds_cos <- total_mds_cos[total_mds_cos$type=="literal",]
+sentimental_mds_cos <- total_mds_cos[total_mds_cos$type=="sentimental",]
+image_mds_cos <- total_mds_cos[total_mds_cos$type=="image",]
 ```
 
 ```{r}
 # K-means clustering
-total_clust <- kmeans(total_mds, length(categories))$cluster %>% as.factor()
-category_clust <- as.factor(categories) # simply translate categories into numbers for clustering, assuming each category is a cluster.
-image_clust <- kmeans(image_mds, length(categories))$cluster %>% as.factor()
-literal_clust <- kmeans(literal_mds, length(categories))$cluster %>% as.factor()
-sentimental_clust <- kmeans(sentimental_mds, length(categories))$cluster %>% as.factor()
+image_clust_eucl <- kmeans(image_mds_eucl[,1:2], length(categories))$cluster %>% as.factor()
+literal_clust_eucl <- kmeans(literal_mds_eucl[,1:2], length(categories))$cluster %>% as.factor()
+sentimental_clust_eucl <- kmeans(sentimental_mds_eucl[,1:2], length(categories))$cluster %>% as.factor()
+descr_clust_eucl <- kmeans(rbind(literal_mds_eucl[,1:2],sentimental_mds_eucl[,1:2]), length(categories))$cluster %>% as.factor()
 
-# Group MDS matrices 
-total_mds <- total_mds %>% mutate(groups = total_clust)
-category_mds <- category_mds %>% mutate(groups = 1:length(categories))
-image_mds <- image_mds %>% mutate(groups = image_clust)
-literal_mds <- literal_mds %>% mutate(groups = literal_clust)
-sentimental_mds <- sentimental_mds %>% mutate(groups = sentimental_clust)
+image_clust_cos <- kmeans(image_mds_cos[,1:2], length(categories))$cluster %>% as.factor()
+literal_clust_cos <- kmeans(literal_mds_cos[,1:2], length(categories))$cluster %>% as.factor()
+sentimental_clust_cos <- kmeans(sentimental_mds_cos[,1:2], length(categories))$cluster %>% as.factor()
+descr_clust_cos <- kmeans(rbind(literal_mds_cos[,1:2],sentimental_mds_cos[,1:2]), length(categories))$cluster %>% as.factor()
+
+
+# Assign cluster groups to MDS matrices 
+category_mds_eucl <- category_mds_eucl %>% mutate(group = 1:length(categories))
+image_mds_eucl <- image_mds_eucl %>% mutate(group = image_clust_eucl)
+literal_mds_eucl <- literal_mds_eucl %>% mutate(group = literal_clust_eucl)
+sentimental_mds_eucl <- sentimental_mds_eucl %>% mutate(group = sentimental_clust_eucl)
+descr_mds_eucl <- rbind(literal_mds_eucl,sentimental_mds_eucl) %>% mutate(group = descr_clust_eucl)
+
+
+category_mds_cos <- category_mds_cos %>% mutate(group = 1:length(categories))
+image_mds_cos <- image_mds_cos %>% mutate(group = image_clust_cos)
+literal_mds_cos <- literal_mds_cos %>% mutate(group = literal_clust_cos)
+sentimental_mds_cos <- sentimental_mds_cos %>% mutate(group = sentimental_clust_cos)
+descr_mds_cos <- rbind(literal_mds_cos, sentimental_mds_cos) %>% mutate(group = descr_clust_cos)
 
 ```
 
-```{r}
-clusterPanel <- function (x, y, col = par("col"), bg = NA, pch = par("pch"), 
-    cex = 1, col.smooth = 2, span = 2/3, iter = 3, ...) 
-{
-    points(x, y, pch = pch, col = col, bg = bg, cex = cex, xlab = names(x), ylab = names(y))
-
-}
-```
+Plot Description embeddings with base R:
 
 ```{r}
-png("plots/clusters_total.png", 1400, 1400, type = 'cairo')
+# To plot the descriptions using base R, use the following code:
+png("plots/embeddings_mds_eucl_descriptions.png", 1400, 1400, type = 'cairo')
 par(xpd = T, mar=c(8,15,4,10) + 0.1)
-# plot(total_mds[,-3], 
-#        col = coul_16[total_clust],
-#        pch=19,
-#        cex=1.5,
-#        las=1,
-#        cex.axis = axisLabelSize,
-#        cex.main = titleSize,
-#        cex.labels = labelSize)
-
-plot(literal_mds[,-3],
+plot(literal_mds_eucl$Dim.1,literal_mds_eucl$Dim.2,
        col = coul[2],
        pch=19,
        cex=1.5,
@@ -618,50 +641,389 @@ plot(literal_mds[,-3],
        ylim=c(-1,1),
        cex.axis = axisLabelSize,
        cex.main = titleSize,
-       cex.labels = labelSize)
-# 
-points(sentimental_mds[,-3],
-       col = coul[3],
+     ellipse=TRUE)
+
+points(sentimental_mds_eucl$Dim.1,sentimental_mds_eucl$Dim.2,
+       col = coul[1],
        pch=19,
        cex=1.5,
        las=1,
        cex.axis = axisLabelSize,
-       cex.main = titleSize,
-       cex.labels = labelSize)
+       cex.main = titleSize)
 
-points(category_mds[,-3], 
+points(category_mds_eucl$Dim.1,category_mds_eucl$Dim.2,
        col = "black",
-       bg = "white",
-       lwd = 3,
+       bg = coul_16,
+       lwd = 4,
        pch=23,
-       cex=4,
+       cex=6,
        las=1,
        cex.axis = axisLabelSize,
-       cex.main = titleSize,
-       cex.labels = labelSize)
+       cex.main = titleSize)
 
-text(category_mds[,1], category_mds[,2]+.2, category_mds[,3],cex=labelSize)
-
-# legend("right",
-#     legend = levels(as.factor(categories[total_clust])),
-#     pch = 19,
-#     cex=legendLabelSize,
-#     pt.cex = 3,
-#     col = coul_16[total_clust],
-#     text.col = "black",
-#     text.width = .5)
+legend("topright",
+    legend = categories,
+    pch = 24,
+    cex=legendLabelSize,
+    pt.cex = 4,
+    pt.lwd = 3,
+    col = "black",
+    pt.bg = coul_16,
+    text.col = "black")
 par(mar=c(5, 4, 4, 2) + 0.1)
-  dev.off()
+dev.off()
+```
+
+Plot Description embeddings with ggplot2.
+The plots generated with ggplot2 are a bit less complicated to set up than the base R plots, but the legend currently doesn't include category points.
+```{r}
+library(ggpubr)
+
+# description embeddings by mode, MDS based on cosine dissimilarity
+png("plots/embeddings_mds_cos_descriptions_mode.png", 1400, 1400, type = 'cairo')
+ggscatter(
+     descr_mds_cos, x="Dim.1", y="Dim.2",
+     palette = c(coul[2],coul[1]),
+     ellipse = TRUE,
+     size = 4,  
+     legend = "bottomright", 
+     ggtheme = theme_bw(),
+     color = "type",
+     alpha=0.75,
+     font.tickslab = c(axisLabelSize*12, "plain"),
+     font.x = c(axisLabelSize*16, "plain"),
+     font.y = c(axisLabelSize*16, "plain"),
+     font.title = c(titleSize*22, "bold"),
+     font.subtitle = c(titleSize*14, "plain"),
+     font.legend = c(axisLabelSize*16, "plain"),
+     cex.main = titleSize
+) + stat_mean(aes(fill=type),
+     size=10,
+     shape=21, 
+     stroke = 1,
+     color="black",
+     alpha=0.5) + 
+  geom_point(category_mds_cos,
+             mapping=aes(x=Dim.1,
+                         y=Dim.2,
+                         fill=coul_16[category_mds_cos$group]),
+             fill=coul_16[category_mds_cos$group],
+             shape=24,
+             size=10, 
+             stroke = 2)+
+  labs(title = "Description embeddings, grouped by mode",
+       subtitle = "MDS based on cosine dissimilarity")+
+  coord_cartesian(xlim =c(-0.7,-0.5), ylim = c(-0.25, 0.25))+
+  theme(legend.position = c(0.85, 0.1),
+        plot.margin = unit(c(1, 1, 1, 1), "cm"))  
+dev.off()
+
+# description embeddings by mode, MDS based on euclidean distance
+png("plots/embeddings_mds_eucl_descriptions_mode.png", 1400, 1400, type = 'cairo')
+ggscatter(
+     descr_mds_eucl, x="Dim.1", y="Dim.2",
+     palette = c(coul[2],coul[1]),
+     ellipse = TRUE,
+     size = 4,  
+     legend = "bottomright", 
+     ggtheme = theme_bw(),
+     color = "type",
+     alpha=0.75,
+     font.tickslab = c(axisLabelSize*12, "plain"),
+     font.x = c(axisLabelSize*16, "plain"),
+     font.y = c(axisLabelSize*16, "plain"),
+     font.title = c(titleSize*22, "bold"),
+     font.subtitle = c(titleSize*14, "plain"),
+     font.legend = c(axisLabelSize*16, "plain"),
+     cex.main = titleSize
+) + stat_mean(aes(fill=type),
+     size=10,
+     shape=21, 
+     stroke = 1,
+     color="black",
+     alpha=0.5) + 
+  geom_point(category_mds_eucl,
+             mapping=aes(x=Dim.1,
+                         y=Dim.2,
+                         fill=coul_16[category_mds_eucl$group]),
+             fill=coul_16[category_mds_eucl$group],
+             shape=24,
+             size=10, 
+             stroke = 2)+
+  labs(title = "Description embeddings, grouped by mode",
+       subtitle = "MDS based on euclidean distance")+
+  coord_cartesian(xlim =c(-11,-6), ylim = c(-1, 1))+
+  theme(legend.position = c(0.85, 0.1),
+        plot.margin = unit(c(1, 1, 1, 1), "cm"))  
+dev.off()
+
+
+# description embeddings by category, MDS based on cosine dissimilarity
+png("plots/embeddings_mds_cos_descriptions_category.png", 1400, 1400, type = 'cairo')
+ggscatter(
+     descr_mds_cos, x="Dim.1", y="Dim.2",
+     palette = coul_16,
+     ellipse = TRUE,
+     size = 4,  
+     legend = "right", 
+     ggtheme = theme_bw(),
+     color = "category",
+     alpha=0.75,
+     font.tickslab = c(axisLabelSize*12, "plain"),
+     font.x = c(axisLabelSize*16, "plain"),
+     font.y = c(axisLabelSize*16, "plain"),
+     font.title = c(titleSize*22, "bold"),
+     font.subtitle = c(titleSize*14, "plain"),
+     font.legend = c(axisLabelSize*16, "plain"),
+     cex.main = titleSize
+) + stat_mean(aes(fill=category),
+     size=10,
+     shape=21, 
+     stroke = 1,
+     color="black",
+     alpha=0.5) + 
+  geom_point(category_mds_cos,
+             mapping=aes(x=Dim.1,
+                         y=Dim.2,
+                         fill=coul_16[category_mds_cos$group]),
+             fill=coul_16[category_mds_cos$group],
+             shape=24,
+             size=10, 
+             stroke = 2)+
+  labs(title = "Description embeddings, grouped by category",
+       subtitle = "MDS based on cosine dissimilarity")+
+  coord_cartesian(xlim =c(-0.7,-0.5), ylim = c(-0.25, 0.25))+
+  theme(legend.position = c(0.85, 0.5),
+        plot.margin = unit(c(1, 1, 1, 1), "cm"))  
+dev.off()
+
+# description embeddings by category, MDS based on euclidean distance
+png("plots/embeddings_mds_eucl_descriptions_category.png", 1400, 1400, type = 'cairo')
+ggscatter(
+     descr_mds_eucl, x="Dim.1", y="Dim.2",
+     palette = coul_16,
+     ellipse = TRUE,
+     size = 4,  
+     legend = "right", 
+     ggtheme = theme_bw(),
+     color = "category",
+     alpha=0.75,
+     font.tickslab = c(axisLabelSize*12, "plain"),
+     font.x = c(axisLabelSize*16, "plain"),
+     font.y = c(axisLabelSize*16, "plain"),
+     font.title = c(titleSize*22, "bold"),
+     font.subtitle = c(titleSize*14, "plain"),
+     font.legend = c(axisLabelSize*16, "plain"),
+     cex.main = titleSize
+) + stat_mean(aes(fill=category),
+     size=10,
+     shape=21, 
+     stroke = 1,
+     color="black",
+     alpha=0.5) + 
+  geom_point(category_mds_eucl,
+             mapping=aes(x=Dim.1,
+                         y=Dim.2,
+                         fill=coul_16[category_mds_eucl$group]),
+             fill=coul_16[category_mds_eucl$group],
+             shape=24,
+             size=10, 
+             stroke = 2)+
+  labs(title = "Description embeddings, grouped by category",
+       subtitle = "MDS based on euclidean distance")+
+  coord_cartesian(xlim =c(-11,-6), ylim = c(-1, 1))+
+  theme(legend.position = c(0.85, 0.5),
+        plot.margin = unit(c(1, 1, 1, 1), "cm"))  
+dev.off()
 
 ```
+Plot image embeddings:
 ```{r}
+# image embeddings by category, MDS based on cosine dissimilarity
+png("plots/embeddings_mds_cos_images.png", 1400, 1400, type = 'cairo')
+ggscatter(
+     image_mds_cos, x="Dim.1", y="Dim.2",
+     palette = coul_16,
+     ellipse = TRUE,
+     size = 4,  
+     legend = "topleft", 
+     ggtheme = theme_bw(),
+     color = "category",
+     alpha=0.75,
+     font.tickslab = c(axisLabelSize*12, "plain"),
+     font.x = c(axisLabelSize*16, "plain"),
+     font.y = c(axisLabelSize*16, "plain"),
+     font.title = c(titleSize*22, "bold"),
+     font.subtitle = c(titleSize*14, "plain"),
+     font.legend = c(axisLabelSize*16, "plain"),
+     cex.main = titleSize
+) + stat_mean(aes(fill=category),
+     size=10,
+     shape=21, 
+     stroke = 1,
+     color="black",
+     alpha=0.5) +
+  labs(title = "Image embeddings, grouped by category",
+       subtitle = "MDS based on cosine dissimilarity matrix")+
+  theme(legend.position = c(0.1, 0.5),
+        plot.margin = unit(c(1, 1, 1, 1), "cm"))  
+dev.off()
+
+# image embeddings by category, MDS based on euclidean distance
+png("plots/embeddings_mds_eucl_images.png", 1400, 1400, type = 'cairo')
+ggscatter(
+     image_mds_eucl, x="Dim.1", y="Dim.2",
+     palette = coul_16,
+     ellipse = TRUE,
+     size = 4,  
+     legend = "topleft", 
+     ggtheme = theme_bw(),
+     color = "category",
+     alpha=0.75,
+     font.tickslab = c(axisLabelSize*12, "plain"),
+     font.x = c(axisLabelSize*16, "plain"),
+     font.y = c(axisLabelSize*16, "plain"),
+     font.title = c(titleSize*22, "bold"),
+     font.subtitle = c(titleSize*14, "plain"),
+     font.legend = c(axisLabelSize*16, "plain"),
+     cex.main = titleSize
+) + stat_mean(aes(fill=category),
+     size=10,
+     shape=21, 
+     stroke = 1,
+     color="black",
+     alpha=0.5) +
+  labs(title = "Image embeddings, grouped by category",
+       subtitle = "MDS based on euclidean distance matrix")+
+  theme(legend.position = c(0.1, 0.5),
+        plot.margin = unit(c(1, 1, 1, 1), "cm"))  
+dev.off()
+
+```
+
+Plot all embeddings (categories, descriptions, images):
+```{r}
+# Sort embeddings by type to ensure that categories are plotted after descriptions.
+total_mds_cos <- total_mds_cos[order(total_mds_cos$type, decreasing = TRUE),]
+total_mds_eucl <- total_mds_eucl[order(total_mds_eucl$type, decreasing = TRUE),]
+
+# all embeddings by category, MDS based on cosine dissimilarity
+png("plots/embeddings_mds_cos_all_category.png", 1400, 1400, type = 'cairo')
+ggscatter(
+     total_mds_cos, x="Dim.1", y="Dim.2",
+     palette = coul_16,
+     size = 4,  
+     legend = "topleft", 
+     ggtheme = theme_bw(),
+     color = "category",
+     shape ="type",
+     alpha=0.75,
+     font.tickslab = c(axisLabelSize*12, "plain"),
+     font.x = c(axisLabelSize*16, "plain"),
+     font.y = c(axisLabelSize*16, "plain"),
+     font.title = c(titleSize*22, "bold"),
+     font.subtitle = c(titleSize*14, "plain"),
+     font.legend = c(axisLabelSize*16, "plain"),
+     cex.main = titleSize
+) + stat_mean(aes(fill=category),
+     size=10,
+     shape=21, 
+     stroke = 1,
+     color="black",
+     alpha=0.5) +
+  labs(title = "All embeddings, \ngrouped by category",
+       subtitle = "MDS based on cosine dissimilarity matrix")+
+  theme(legend.position = c(0.5, 0.5),
+        plot.margin = unit(c(1, 1, 1, 1), "cm"))  
+dev.off()
+
+# all embeddings by category, MDS based on euclidean distance
+png("plots/embeddings_mds_eucl_all_category.png", 1400, 1400, type = 'cairo')
+ggscatter(
+     total_mds_eucl, x="Dim.1", y="Dim.2",
+     palette = coul_16,
+     size = 4,  
+     legend = "bottom", 
+     ggtheme = theme_bw(),
+     color = "category",
+     shape ="type",
+     alpha = 0.75,
+     font.tickslab = c(axisLabelSize*12, "plain"),
+     font.x = c(axisLabelSize*16, "plain"),
+     font.y = c(axisLabelSize*16, "plain"),
+     font.title = c(titleSize*22, "bold"),
+     font.subtitle = c(titleSize*14, "plain"),
+     font.legend = c(axisLabelSize*16, "plain"),
+     cex.main = titleSize
+) + stat_mean(aes(fill=category),
+     size=10,
+     shape=21, 
+     stroke = 1,
+     color="black",
+     alpha=0.5) +
+  labs(title = "All embeddings, \ngrouped by category",
+       subtitle = "MDS based on euclidean distance matrix")+
+  theme(legend.position = c(0.5, 0.5),
+        plot.margin = unit(c(1, 1, 1, 1), "cm"))  
+dev.off()
+
+# all embeddings by type, MDS based on cosine dissimilarity
+png("plots/embeddings_mds_cos_all_type.png", 1400, 1400, type = 'cairo')
+ggscatter(
+     total_mds_cos, x="Dim.1", y="Dim.2",
+     palette = coul_16,
+     size = 4,  
+     legend = "topleft", 
+     ggtheme = theme_bw(),
+     color = "type",
+     font.tickslab = c(axisLabelSize*12, "plain"),
+     font.x = c(axisLabelSize*16, "plain"),
+     font.y = c(axisLabelSize*16, "plain"),
+     font.title = c(titleSize*22, "bold"),
+     font.subtitle = c(titleSize*14, "plain"),
+     font.legend = c(axisLabelSize*16, "plain"),
+     cex.main = titleSize
+) +
+  labs(title = "All embeddings, grouped by category",
+       subtitle = "MDS based on cosine dissimilarity matrix")+
+  theme(legend.position = c(0.5, 0.5),
+        plot.margin = unit(c(1, 1, 1, 1), "cm"))  
+dev.off()
+
+# all embeddings by category, MDS based on euclidean distance
+png("plots/embeddings_mds_eucl_all_type.png", 1400, 1400, type = 'cairo')
+ggscatter(
+     total_mds_eucl, x="Dim.1", y="Dim.2",
+     palette = coul_16,
+     size = 4,  
+     legend = "bottom", 
+     ggtheme = theme_bw(),
+     color = "type",
+     font.tickslab = c(axisLabelSize*12, "plain"),
+     font.x = c(axisLabelSize*16, "plain"),
+     font.y = c(axisLabelSize*16, "plain"),
+     font.title = c(titleSize*22, "bold"),
+     font.subtitle = c(titleSize*14, "plain"),
+     font.legend = c(axisLabelSize*16, "plain"),
+     cex.main = titleSize
+) +
+  labs(title = "All embeddings, grouped by type",
+       subtitle = "MDS based on euclidean distance matrix")+
+  theme(legend.position = c(0.5, 0.5),
+        plot.margin = unit(c(1, 1, 1, 1), "cm"))  
+dev.off()
+
+```
+
+```{r}
+library(cluster)
 desc_embeddings <- rbind(literal_embeddings,sentimental_embeddings)
 
 total_clust <- kmeans(embeddings, 2)
 desc_clust <- kmeans(desc_embeddings, 2)
 image_clust <- kmeans(image_embeddings, 15)
 
-png("plots/clusters_all.png", 1000, 1000, type = 'cairo')
+png("plots/clusters_pca_all.png", 1000, 1000, type = 'cairo')
 par(mar=c(14, 10, 8, 4) + 0.1)
 clusplot(embeddings, 
          total_clust$cluster, 
@@ -683,7 +1045,7 @@ title(xlab = "These two components explain 15.17% of the point variability.", ce
 title(ylab = "Component 2", cex.lab = labelSize, line = 4)
 dev.off()
 
-png("plots/clusters_image.png", 1000, 1000, type = 'cairo')
+png("plots/clusters_pca_image.png", 1000, 1000, type = 'cairo')
 par(mar=c(14, 10, 8, 4) + 0.1)
 clusplot(image_embeddings, 
          image_clust$cluster, 
@@ -705,7 +1067,7 @@ title(xlab = "These two components explain 12.93% of the point variability.", ce
 title(ylab = "Component 2", cex.lab = labelSize, line = 4)
 dev.off()
 
-png("plots/clusters_descriptions.png", 1000, 1000, type = 'cairo')
+png("plots/clusters_pca_descriptions.png", 1000, 1000, type = 'cairo')
 par(mar=c(14, 10, 8, 4) + 0.1)
 clusplot(desc_embeddings, 
          desc_clust$cluster, 
