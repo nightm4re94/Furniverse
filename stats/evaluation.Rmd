@@ -931,7 +931,7 @@ ggscatter(
      stroke = 1,
      color="black",
      alpha=0.5) +
-  labs(title = "All embeddings, \ngrouped by category",
+  labs(title = "All embeddings, grouped by category",
        subtitle = "MDS based on cosine dissimilarity matrix")+
   theme(legend.position = c(0.5, 0.5),
         plot.margin = unit(c(1, 1, 1, 1), "cm"))  
@@ -961,7 +961,7 @@ ggscatter(
      stroke = 1,
      color="black",
      alpha=0.5) +
-  labs(title = "All embeddings, \ngrouped by category",
+  labs(title = "All embeddings, grouped by category",
        subtitle = "MDS based on euclidean distance matrix")+
   theme(legend.position = c(0.5, 0.5),
         plot.margin = unit(c(1, 1, 1, 1), "cm"))  
