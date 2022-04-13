@@ -1173,6 +1173,7 @@ write.csv(eucl_stats,"euclDist_literal_vs_sentimental.csv", row.names=TRUE)
 ```
 
 ```{r}
+library(dplyr)
 embeddings$category <- sub("-.*", "",sub("_.*", "", rownames(embeddings)))
 embeddings$type[endsWith(rownames(embeddings), "category")] <- "category"
 embeddings$type[grepl("literal",rownames(embeddings), fixed = TRUE)] <- "literal"
@@ -1281,6 +1282,8 @@ prototype_mds_cos$category <- categories
 
 
 ```{r}
+library(ggpubr)
+
 # prototype embeddings by category, MDS based on euclidean distance
 png("plots/embeddings_mds_eucl_proto_category.png", 1400, 1400, type = 'cairo')
 ggscatter(
