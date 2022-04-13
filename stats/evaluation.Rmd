@@ -41,6 +41,8 @@ coul_16 <- c('#e6194B',
              '#a9a9a9')
 coul_16_Bord <- sapply(sapply(coul_16, darken), darken)
 
+coul_heatmap <- brewer.pal(9,"YlOrRd")
+
 titleSize <- 2.5
 axisLabelSize <- 2.5
 labelSize <- 3
@@ -314,7 +316,7 @@ for (title in annotator_vars_numeric){
   annotator_stats <- rbind(annotator_stats, summary)
 }
 
-library("plyr")
+library(plyr)
 for (title in annotator_vars_nonNumeric){
   column <- annotators[,title]
   max <- round_any(max(matrix(table(column))[,1]), 5, f = ceiling) 
@@ -556,21 +558,21 @@ sentimental_embeddings <- embeddings[grepl("sentimental",rownames(embeddings), f
 ```
 Compute euclidean distance and cosine dissimilarity matrices, then apply multidimensional scaling. This step takes a few minutes.
 ```{r}
-embeddings_dist_eucl <- dist(embeddings)
+embeddings_dist_eucl <- dist(embeddings, diag=FALSE, upper=FALSE)
 
 embeddings_matrix <- as.matrix(embeddings)
 embeddings_sim <- embeddings_matrix / sqrt(rowSums(embeddings_matrix * embeddings_matrix))
 embeddings_sim <- embeddings_sim %*% t(embeddings_sim)
-embeddings_dist_cos <- as.dist(1 - embeddings_sim)
+embeddings_dist_cos <- as.dist(1 - embeddings_sim, diag = FALSE, upper = FALSE)
+rm(embeddings_matrix, embeddings_sim)
 
 # Apply Multidimensional Scaling (MDS)
 total_mds_eucl <-  as.data.frame(cmdscale(embeddings_dist_eucl))
 total_mds_cos <-  as.data.frame(cmdscale(embeddings_dist_cos))
-
+rm(embeddings_dist_eucl,embeddings_dist_cos)
 colnames(total_mds_eucl) <- dim_names
 colnames(total_mds_cos) <- dim_names
 ```
-
 
 ```{r}
 total_mds_eucl$category <- sub("-.*", "",sub("_.*", "", rownames(total_mds_eucl)))
@@ -677,10 +679,8 @@ dev.off()
 Plot Description embeddings with ggplot2.
 The plots generated with ggplot2 are a bit less complicated to set up than the base R plots, but the legend currently doesn't include category points.
 ```{r}
-library(ggpubr)
-
-# description embeddings by mode, MDS based on cosine dissimilarity
-png("plots/embeddings_mds_cos_descriptions_mode.png", 1400, 1400, type = 'cairo')
+# description embeddings by type, MDS based on cosine dissimilarity
+png("plots/embeddings_mds_cos_descriptions_type.png", 1400, 1400, type = 'cairo')
 ggscatter(
      descr_mds_cos, x="Dim.1", y="Dim.2",
      palette = c(coul[2],coul[1]),
@@ -711,15 +711,15 @@ ggscatter(
              shape=24,
              size=10, 
              stroke = 2)+
-  labs(title = "Description embeddings, grouped by mode",
+  labs(title = "Description embeddings, grouped by type",
        subtitle = "MDS based on cosine dissimilarity")+
   coord_cartesian(xlim =c(-0.7,-0.5), ylim = c(-0.25, 0.25))+
   theme(legend.position = c(0.85, 0.1),
         plot.margin = unit(c(1, 1, 1, 1), "cm"))  
 dev.off()
 
-# description embeddings by mode, MDS based on euclidean distance
-png("plots/embeddings_mds_eucl_descriptions_mode.png", 1400, 1400, type = 'cairo')
+# description embeddings by type, MDS based on euclidean distance
+png("plots/embeddings_mds_eucl_descriptions_type.png", 1400, 1400, type = 'cairo')
 ggscatter(
      descr_mds_eucl, x="Dim.1", y="Dim.2",
      palette = c(coul[2],coul[1]),
@@ -750,7 +750,7 @@ ggscatter(
              shape=24,
              size=10, 
              stroke = 2)+
-  labs(title = "Description embeddings, grouped by mode",
+  labs(title = "Description embeddings, grouped by type",
        subtitle = "MDS based on euclidean distance")+
   coord_cartesian(xlim =c(-11,-6), ylim = c(-1, 1))+
   theme(legend.position = c(0.85, 0.1),
@@ -984,7 +984,7 @@ ggscatter(
      font.legend = c(axisLabelSize*16, "plain"),
      cex.main = titleSize
 ) +
-  labs(title = "All embeddings, grouped by category",
+  labs(title = "All embeddings, grouped by type",
        subtitle = "MDS based on cosine dissimilarity matrix")+
   theme(legend.position = c(0.5, 0.5),
         plot.margin = unit(c(1, 1, 1, 1), "cm"))  
@@ -1171,5 +1171,174 @@ rownames(eucl_stats) <- c(categories, "total")
 write.csv(cos_stats,"cosSim_literal_vs_sentimental.csv", row.names=TRUE)
 write.csv(eucl_stats,"euclDist_literal_vs_sentimental.csv", row.names=TRUE)
 ```
+
+```{r}
+embeddings$category <- sub("-.*", "",sub("_.*", "", rownames(embeddings)))
+embeddings$type[endsWith(rownames(embeddings), "category")] <- "category"
+embeddings$type[grepl("literal",rownames(embeddings), fixed = TRUE)] <- "literal"
+embeddings$type[grepl("sentimental",rownames(embeddings), fixed = TRUE)] <- "sentimental"
+embeddings$type[endsWith(rownames(embeddings), ".png")] <- "image"
+embeddings <- embeddings %>% select("category", everything()) %>% select("type", everything())
+```
+
+```{r}
+euclidean <- function(a, b) sqrt(sum((a - b)^2))
+prototype_embeddings <- data.frame(matrix(ncol = ncol(embeddings)-2, nrow = 0))
+
+for (cat in categories){
+  prototype_embeddings <- rbind(prototype_embeddings,colMeans(embeddings[embeddings$category==cat,-(1:2)]))
+}
+rownames(prototype_embeddings) <- categories
+colnames(prototype_embeddings) <- 1:length(prototype_embeddings)
+prototype_dist_eucl <- dist(prototype_embeddings, diag = FALSE, upper = FALSE)
+
+prototype_matrix <- as.matrix(prototype_embeddings)
+prototype_sim <- prototype_matrix / sqrt(rowSums(prototype_matrix * prototype_matrix))
+prototype_sim <- prototype_sim %*% t(prototype_sim)
+prototype_dist_cos <- as.dist(1 - prototype_sim, diag = FALSE, upper = FALSE)
+
+write.csv(as.data.frame(prototype_dist_eucl),"category_prototype_dist_eucl.csv", row.names=TRUE)
+write.csv(as.data.frame(prototype_dist_cos),"category_prototype_dist_cos.csv", row.names=TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(tidyr)
+library(shadowtext)
+library(ProcMod)
+
+# Plot heatmap of euclidean distance between category prototypes
+df_eucl <- round(as.data.frame(prototype_dist_eucl),2)
+df_eucl$category1 <- rownames(df_eucl)
+df_eucl <- df_eucl %>% select("category1", everything())
+eucl_tidied <- pivot_longer(df_eucl,cols=colnames(df_eucl)[-1], names_to='category2', values_to = "eucl") 
+png("plots/category_prototype_eucl_dist.png", 1400, 1400, type = 'cairo')
+
+ggplot(eucl_tidied,
+       aes(x=category1,y=rev(category2)))+ 
+  geom_raster(aes(fill=eucl)) +
+  scale_fill_distiller(palette = "YlGnBu", direction =1) +
+  geom_shadowtext(aes(label = eucl), color = "white", bg.colour='black', size = 7) +
+  coord_fixed()+
+  labs(title = "Euclidean distance between category prototypes") +
+  labs(x = "Category 1", y = "Category 2") +
+  scale_y_discrete(labels=rev(eucl_tidied$category2)) +
+  theme(legend.title = element_text(size=32),
+        legend.text = element_text(size=32),
+        legend.key.height = unit(4, 'cm'),
+        plot.title = element_text(size=48, margin = margin(0,20,20,20)),
+        plot.margin = unit(c(2, 2, 2, 2), "cm"),
+        axis.title.x = element_text(size=32, margin = margin(40,10,10,10)),
+        axis.title.y = element_text(size=32, margin = margin(10,40,10,20)),
+        axis.text = element_text(size=32),
+        axis.text.x = element_text(angle = 90, hjust = 1)
+        ) 
+dev.off()
+
+# Plot heatmap of cosine dissimilarity between category prototypes
+df_cos <- round(as.data.frame(prototype_dist_cos),2)
+df_cos$category1 <- rownames(df_cos)
+df_cos <- df_cos %>% select("category1", everything())
+cos_tidied <- pivot_longer(df_cos,cols=colnames(df_cos)[-1], names_to='category2', values_to = "cos") 
+
+png("plots/category_prototype_cos_dist.png", 1400, 1400, type = 'cairo')
+
+ggplot(cos_tidied,
+       aes(x=category1,y=rev(category2)))+ 
+  geom_raster(aes(fill=cos)) +
+  scale_fill_distiller(palette = "YlGnBu", direction =1) +
+  geom_shadowtext(aes(label = cos), color = "white", bg.colour='black', size = 7) +
+  coord_fixed()+
+  labs(title = "Cosine dissimilarity between category prototypes") +
+  labs(x = "Category 1", y = "Category 2") +
+  scale_y_discrete(labels=rev(cos_tidied$category2)) +
+  theme(legend.title = element_text(size=32),
+        legend.text = element_text(size=32),
+        legend.key.height = unit(4, 'cm'),
+        plot.title = element_text(size=48, margin = margin(0,20,20,20)),
+        plot.margin = unit(c(2, 2, 2, 2), "cm"),
+        axis.title.x = element_text(size=32, margin = margin(40,10,10,10)),
+        axis.title.y = element_text(size=32, margin = margin(10,40,10,20)),
+        axis.text = element_text(size=32),
+        axis.text.x = element_text(angle = 90, hjust = 1)
+        ) 
+
+dev.off()
+
+```
+
+```{r}
+# Apply Multidimensional Scaling (MDS)
+prototype_mds_eucl <-  as.data.frame(cmdscale(prototype_dist_eucl))
+prototype_mds_cos <-  as.data.frame(cmdscale(prototype_dist_cos))
+
+colnames(prototype_mds_eucl) <- dim_names
+colnames(prototype_mds_cos) <- dim_names
+
+prototype_mds_eucl$category <- categories
+prototype_mds_cos$category <- categories
+```
+
+
+```{r}
+# prototype embeddings by category, MDS based on euclidean distance
+png("plots/embeddings_mds_eucl_proto_category.png", 1400, 1400, type = 'cairo')
+ggscatter(
+     prototype_mds_eucl, x="Dim.1", y="Dim.2",
+     palette = coul_16,
+     size = 4,  
+     legend = "bottom", 
+     ggtheme = theme_bw(),
+     color = "category",
+     alpha = 0.75,
+     font.tickslab = c(axisLabelSize*12, "plain"),
+     font.x = c(axisLabelSize*16, "plain"),
+     font.y = c(axisLabelSize*16, "plain"),
+     font.title = c(titleSize*22, "bold"),
+     font.subtitle = c(titleSize*14, "plain"),
+     font.legend = c(axisLabelSize*16, "plain"),
+     cex.main = titleSize
+) + stat_mean(aes(fill=category),
+     size=10,
+     shape=21, 
+     stroke = 1,
+     color="black",
+     alpha=0.5) +
+  labs(title = "Category prototype embeddings",
+       subtitle = "MDS based on euclidean distance matrix")+
+  theme(legend.position = c(0.85, 0.7),
+        plot.margin = unit(c(1, 1, 1, 1), "cm"))  
+dev.off()
+
+# prototype embeddings by category, MDS based on cosine similarity
+png("plots/embeddings_mds_cos_proto_category.png", 1400, 1400, type = 'cairo')
+ggscatter(
+     prototype_mds_cos, x="Dim.1", y="Dim.2",
+     palette = coul_16,
+     size = 4,  
+     legend = "bottom", 
+     ggtheme = theme_bw(),
+     color = "category",
+     alpha = 0.75,
+     font.tickslab = c(axisLabelSize*12, "plain"),
+     font.x = c(axisLabelSize*16, "plain"),
+     font.y = c(axisLabelSize*16, "plain"),
+     font.title = c(titleSize*22, "bold"),
+     font.subtitle = c(titleSize*14, "plain"),
+     font.legend = c(axisLabelSize*16, "plain"),
+     cex.main = titleSize
+) + stat_mean(aes(fill=category),
+     size=10,
+     shape=21, 
+     stroke = 1,
+     color="black",
+     alpha=0.5) +
+  labs(title = "Category prototype embeddings",
+       subtitle = "MDS based on cosine dissimilarity matrix")+
+  theme(legend.position = c(0.1, 0.5),
+        plot.margin = unit(c(1, 1, 1, 1), "cm"))  
+dev.off()
+```
+
 
 
