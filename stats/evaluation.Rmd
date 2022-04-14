@@ -542,7 +542,6 @@ write.csv(t_tests,"autoTagsEvaluation.csv", row.names=FALSE)
 
 ```
 ```{r}
-library(magrittr)
 library(dplyr)
 library(ggpubr)
 
@@ -550,11 +549,20 @@ categories <- c("bed", "bench", "cabinet", "chair", "chest", "couch", "decoratio
 
 dim_names <- c("Dim.1", "Dim.2")
 
+
+all_models <- levels(factor(sub("_.*", "", rownames(embeddings)[grepl("-",rownames(embeddings), fixed = TRUE)])))
+for(model in all_models){
+  means <- as.data.frame(t(colMeans(embeddings[grepl(model,rownames(embeddings), fixed = TRUE), ])))
+  rownames(means) <- sprintf("%s_mean", model)
+  embeddings <- rbind(embeddings, means)
+}
+
 # Create embeddings subsets
 category_embeddings <- embeddings[endsWith(rownames(embeddings), "category"),]
 image_embeddings <- embeddings[endsWith(rownames(embeddings), ".png"),]
 literal_embeddings <- embeddings[grepl("literal",rownames(embeddings), fixed = TRUE),]
 sentimental_embeddings <- embeddings[grepl("sentimental",rownames(embeddings), fixed = TRUE),]
+model_embeddings <- embeddings[endsWith(rownames(embeddings), "mean"),]
 ```
 Compute euclidean distance and cosine dissimilarity matrices, then apply multidimensional scaling. This step takes a few minutes.
 ```{r}
@@ -569,7 +577,6 @@ rm(embeddings_matrix, embeddings_sim)
 # Apply Multidimensional Scaling (MDS)
 total_mds_eucl <-  as.data.frame(cmdscale(embeddings_dist_eucl))
 total_mds_cos <-  as.data.frame(cmdscale(embeddings_dist_cos))
-rm(embeddings_dist_eucl,embeddings_dist_cos)
 colnames(total_mds_eucl) <- dim_names
 colnames(total_mds_cos) <- dim_names
 ```
@@ -580,11 +587,13 @@ total_mds_eucl$type[endsWith(rownames(total_mds_eucl), "category")] <- "category
 total_mds_eucl$type[grepl("literal",rownames(total_mds_eucl), fixed = TRUE)] <- "literal"
 total_mds_eucl$type[grepl("sentimental",rownames(total_mds_eucl), fixed = TRUE)] <- "sentimental"
 total_mds_eucl$type[endsWith(rownames(total_mds_eucl), ".png")] <- "image"
+total_mds_eucl$type[endsWith(rownames(total_mds_eucl), "mean")] <- "mean"
 
 category_mds_eucl <- total_mds_eucl[total_mds_eucl$type=="category",]
 literal_mds_eucl <- total_mds_eucl[total_mds_eucl$type=="literal",]
 sentimental_mds_eucl <- total_mds_eucl[total_mds_eucl$type=="sentimental",]
 image_mds_eucl <- total_mds_eucl[total_mds_eucl$type=="image",]
+model_mds_eucl <- total_mds_eucl[total_mds_eucl$type=="mean",]
 
 
 total_mds_cos$category <- sub("-.*", "",sub("_.*", "", rownames(total_mds_cos)))
@@ -592,11 +601,15 @@ total_mds_cos$type[endsWith(rownames(total_mds_cos), "category")] <- "category"
 total_mds_cos$type[grepl("literal",rownames(total_mds_cos), fixed = TRUE)] <- "literal"
 total_mds_cos$type[grepl("sentimental",rownames(total_mds_cos), fixed = TRUE)] <- "sentimental"
 total_mds_cos$type[endsWith(rownames(total_mds_cos), ".png")] <- "image"
+total_mds_cos$type[endsWith(rownames(total_mds_cos), "mean")] <- "mean"
+
 
 category_mds_cos <- total_mds_cos[total_mds_cos$type=="category",]
 literal_mds_cos <- total_mds_cos[total_mds_cos$type=="literal",]
 sentimental_mds_cos <- total_mds_cos[total_mds_cos$type=="sentimental",]
 image_mds_cos <- total_mds_cos[total_mds_cos$type=="image",]
+model_mds_cos <- total_mds_cos[total_mds_cos$type=="mean",]
+
 ```
 
 ```{r}
@@ -605,11 +618,13 @@ image_clust_eucl <- kmeans(image_mds_eucl[,1:2], length(categories))$cluster %>%
 literal_clust_eucl <- kmeans(literal_mds_eucl[,1:2], length(categories))$cluster %>% as.factor()
 sentimental_clust_eucl <- kmeans(sentimental_mds_eucl[,1:2], length(categories))$cluster %>% as.factor()
 descr_clust_eucl <- kmeans(rbind(literal_mds_eucl[,1:2],sentimental_mds_eucl[,1:2]), length(categories))$cluster %>% as.factor()
+model_clust_eucl <- kmeans(model_mds_eucl[,1:2], length(categories))$cluster %>% as.factor()
 
 image_clust_cos <- kmeans(image_mds_cos[,1:2], length(categories))$cluster %>% as.factor()
 literal_clust_cos <- kmeans(literal_mds_cos[,1:2], length(categories))$cluster %>% as.factor()
 sentimental_clust_cos <- kmeans(sentimental_mds_cos[,1:2], length(categories))$cluster %>% as.factor()
 descr_clust_cos <- kmeans(rbind(literal_mds_cos[,1:2],sentimental_mds_cos[,1:2]), length(categories))$cluster %>% as.factor()
+model_clust_cos <- kmeans(model_mds_cos[,1:2], length(categories))$cluster %>% as.factor()
 
 
 # Assign cluster groups to MDS matrices 
@@ -617,7 +632,8 @@ category_mds_eucl <- category_mds_eucl %>% mutate(group = 1:length(categories))
 image_mds_eucl <- image_mds_eucl %>% mutate(group = image_clust_eucl)
 literal_mds_eucl <- literal_mds_eucl %>% mutate(group = literal_clust_eucl)
 sentimental_mds_eucl <- sentimental_mds_eucl %>% mutate(group = sentimental_clust_eucl)
-descr_mds_eucl <- rbind(literal_mds_eucl,sentimental_mds_eucl) %>% mutate(group = descr_clust_eucl)
+descr_mds_eucl <- rbind(literal_mds_eucl, sentimental_mds_eucl) %>% mutate(group = descr_clust_eucl)
+model_mds_eucl <- model_mds_eucl %>% mutate(group = model_clust_eucl)
 
 
 category_mds_cos <- category_mds_cos %>% mutate(group = 1:length(categories))
@@ -625,6 +641,7 @@ image_mds_cos <- image_mds_cos %>% mutate(group = image_clust_cos)
 literal_mds_cos <- literal_mds_cos %>% mutate(group = literal_clust_cos)
 sentimental_mds_cos <- sentimental_mds_cos %>% mutate(group = sentimental_clust_cos)
 descr_mds_cos <- rbind(literal_mds_cos, sentimental_mds_cos) %>% mutate(group = descr_clust_cos)
+model_mds_cos <- model_mds_cos %>% mutate(group = model_clust_cos)
 
 ```
 
@@ -1179,15 +1196,15 @@ embeddings$type[endsWith(rownames(embeddings), "category")] <- "category"
 embeddings$type[grepl("literal",rownames(embeddings), fixed = TRUE)] <- "literal"
 embeddings$type[grepl("sentimental",rownames(embeddings), fixed = TRUE)] <- "sentimental"
 embeddings$type[endsWith(rownames(embeddings), ".png")] <- "image"
+embeddings$type[endsWith(rownames(embeddings), "mean")] <- "mean"
 embeddings <- embeddings %>% select("category", everything()) %>% select("type", everything())
 ```
 
 ```{r}
-euclidean <- function(a, b) sqrt(sum((a - b)^2))
 prototype_embeddings <- data.frame(matrix(ncol = ncol(embeddings)-2, nrow = 0))
 
 for (cat in categories){
-  prototype_embeddings <- rbind(prototype_embeddings,colMeans(embeddings[embeddings$category==cat,-(1:2)]))
+  prototype_embeddings <- rbind(prototype_embeddings,colMeans(embeddings[embeddings$category==cat&embeddings$type!="mean",-(1:2)]))
 }
 rownames(prototype_embeddings) <- categories
 colnames(prototype_embeddings) <- 1:length(prototype_embeddings)
@@ -1341,6 +1358,197 @@ ggscatter(
   theme(legend.position = c(0.1, 0.5),
         plot.margin = unit(c(1, 1, 1, 1), "cm"))  
 dev.off()
+```
+
+```{r}
+# Create a graph of the individual models' averaged positions (similar to the category one). Color by category.
+
+model_mds_cos <- model_mds_cos %>% mutate(modelID=sub("_.*", "", rownames(model_mds_cos)),.before=category)
+model_mds_eucl <- model_mds_eucl %>% mutate(modelID=sub("_.*", "", rownames(model_mds_eucl)),.before=category)
+
+model_mds_cos <- model_mds_cos %>% mutate(model=sub(".*-", "",sub("_.*", "", rownames(model_mds_cos))),.after=category)
+model_mds_eucl <- model_mds_eucl %>% mutate(model=sub(".*-", "",sub("_.*", "", rownames(model_mds_eucl))),.after=category)
+```
+
+```{r}
+library(ggpubr)
+
+# prototype embeddings by category, MDS based on euclidean distance
+png("plots/embeddings_mds_eucl_model_means.png", 1400, 1400, type = 'cairo')
+ggscatter(
+     model_mds_eucl, x="Dim.1", y="Dim.2",
+     palette = coul_16,
+     ellipse = TRUE,
+     size = 4,  
+     legend = "bottom", 
+     ggtheme = theme_bw(),
+     color = "category",
+     alpha = 0.75,
+     font.tickslab = c(axisLabelSize*12, "plain"),
+     font.x = c(axisLabelSize*16, "plain"),
+     font.y = c(axisLabelSize*16, "plain"),
+     font.title = c(titleSize*22, "bold"),
+     font.subtitle = c(titleSize*14, "plain"),
+     font.legend = c(axisLabelSize*16, "plain"),
+     cex.main = titleSize
+) + stat_mean(aes(fill=category),
+     size=10,
+     shape=21, 
+     stroke = 1,
+     color="black",
+     alpha=0.5) +
+  labs(title = "Averaged furnishing embeddings",
+       subtitle = "MDS based on euclidean distance matrix")+
+  theme(legend.position = c(0.1, 0.3),
+        plot.margin = unit(c(1, 1, 1, 1), "cm"))  
+dev.off()
+
+# prototype embeddings by category, MDS based on cosine similarity
+png("plots/embeddings_mds_cos_model_means.png", 1400, 1400, type = 'cairo')
+ggscatter(
+     model_mds_cos, x="Dim.1", y="Dim.2",
+     palette = coul_16,
+     ellipse = TRUE,
+     size = 4,  
+     legend = "bottom", 
+     ggtheme = theme_bw(),
+     color = "category",
+     alpha = 0.75,
+     font.tickslab = c(axisLabelSize*12, "plain"),
+     font.x = c(axisLabelSize*16, "plain"),
+     font.y = c(axisLabelSize*16, "plain"),
+     font.title = c(titleSize*22, "bold"),
+     font.subtitle = c(titleSize*14, "plain"),
+     font.legend = c(axisLabelSize*16, "plain"),
+     cex.main = titleSize
+) + stat_mean(aes(fill=category),
+     size=10,
+     shape=21, 
+     stroke = 1,
+     color="black",
+     alpha=0.5) +
+  labs(title = "Averaged furnishing embeddings",
+       subtitle = "MDS based on cosine dissimilarity matrix")+
+  theme(legend.position = c(0.1, 0.3),
+        plot.margin = unit(c(1, 1, 1, 1), "cm"))  
+dev.off()
+
+```
+We need to validate whether the embeddings distances actually match the categorization and can distinguish between furnishings:
+```{r}
+library(ProcMod)
+
+closest_eucl <- data.frame(matrix(ncol = 0, nrow = 0))
+dist_df_eucl <- as.data.frame(embeddings_dist_eucl)
+
+closest_cos <- data.frame(matrix(ncol = 0, nrow = 0))
+dist_df_cos <- as.data.frame(embeddings_dist_cos)
+
+
+category_dist_eucl <- dist_df_eucl[endsWith(rownames(dist_df_eucl), "category"),]
+literal_dist_eucl <- dist_df_eucl[grepl("literal",rownames(dist_df_eucl), fixed = TRUE),]
+sentimental_dist_eucl <- dist_df_eucl[grepl("sentimental",rownames(dist_df_eucl), fixed = TRUE),]
+image_dist_eucl <- dist_df_eucl[endsWith(rownames(dist_df_eucl), ".png"),]
+model_dist_eucl <- dist_df_eucl[endsWith(rownames(dist_df_eucl), "mean"),]
+
+category_dist_cos <- dist_df_cos[endsWith(rownames(dist_df_cos), "category"),]
+literal_dist_cos <- dist_df_cos[grepl("literal",rownames(dist_df_cos), fixed = TRUE),]
+sentimental_dist_cos <- dist_df_cos[grepl("sentimental",rownames(dist_df_cos), fixed = TRUE),]
+image_dist_cos <- dist_df_cos[endsWith(rownames(dist_df_cos), ".png"),]
+model_dist_cos <- dist_df_cos[endsWith(rownames(dist_df_cos), "mean"),]
+
+
+for(col in 1:ncol(dist_df_eucl)){
+  if(endsWith(rownames(dist_df_eucl)[col], "category")){
+    next
+  }
+  # Consider the 3 nearest categories a confident decision.
+  sorted_cat_comp_eucl <- sort(category_dist_eucl[,col], index.return=TRUE)
+  nearest_cats_eucl <- rownames(category_dist_eucl)[head(sorted_cat_comp_eucl$ix[sorted_cat_comp_eucl$x>0],3)]
+  
+  sorted_cat_comp_cos <- sort(category_dist_cos[,col], index.return=TRUE)
+  nearest_cats_cos <- rownames(category_dist_cos)[head(sorted_cat_comp_cos$ix[sorted_cat_comp_cos$x>0],3)]
+  
+  # Consider the 5 nearest model means a confident decision.
+  sorted_model_comp_eucl <- sort(model_dist_eucl[,col], index.return=TRUE)
+  nearest_models_eucl <- rownames(model_dist_eucl)[head(sorted_model_comp_eucl$ix[sorted_model_comp_eucl$x>0],5)]
+  
+  sorted_model_comp_cos <- sort(model_dist_cos[,col], index.return=TRUE)
+  nearest_models_cos <- rownames(model_dist_cos)[head(sorted_model_comp_cos$ix[sorted_model_comp_cos$x>0],5)]
+    
+  # Consider the 15 nearest literal descriptions a confident decision (15 furnishings per category).
+  sorted_literal_comp_eucl <- sort(literal_dist_eucl[,col], index.return=TRUE)
+  nearest_literal_eucl <- rownames(literal_dist_eucl)[head(sorted_literal_comp_eucl$ix[sorted_literal_comp_eucl$x>0],15)]
+  
+  sorted_literal_comp_cos <- sort(literal_dist_cos[,col], index.return=TRUE)
+  nearest_literal_cos <- rownames(literal_dist_cos)[head(sorted_literal_comp_cos$ix[sorted_literal_comp_cos$x>0],15)]
+  
+  # Consider the 15 nearest sentimental descriptions a confident decision (15 furnishings per category).
+  sorted_sentimental_comp_eucl <- sort(sentimental_dist_eucl[,col], index.return=TRUE)
+  nearest_sentimental_eucl <- rownames(sentimental_dist_eucl)[head(sorted_sentimental_comp_eucl$ix[sorted_sentimental_comp_eucl$x>0],15)]
+  
+  sorted_sentimental_comp_cos <- sort(sentimental_dist_cos[,col], index.return=TRUE)
+  nearest_sentimental_cos <- rownames(sentimental_dist_cos)[head(sorted_sentimental_comp_cos$ix[sorted_sentimental_comp_cos$x>0],15)]
+  
+  # Consider the 24 nearest images a confident decision (24 images per furnishing).
+  sorted_image_comp_eucl <- sort(image_dist_eucl[,col], index.return=TRUE)
+  nearest_images_eucl <- rownames(image_dist_eucl)[head(sorted_image_comp_eucl$ix[sorted_image_comp_eucl$x>0], 24)]
+  
+  sorted_image_comp_cos <- sort(image_dist_cos[,col], index.return=TRUE)
+  nearest_images_cos <- rownames(image_dist_cos)[head(sorted_image_comp_cos$ix[sorted_image_comp_cos$x>0], 24)]
+
+  # add row to dataframe
+  closest_eucl <- rbind(closest_eucl,c(nearest_cats_eucl,
+                                       nearest_models_eucl,
+                                       nearest_literal_eucl,
+                                       nearest_sentimental_eucl,
+                                       nearest_images_eucl))
+  closest_cos <- rbind(closest_cos,c(nearest_cats_cos,                                       
+                                     nearest_models_cos,
+                                     nearest_literal_cos,
+                                     nearest_sentimental_cos,
+                                     nearest_images_cos))
+}
+
+# ensure correct row and column naming
+cats <- paste("category", 1:3, sep="_")
+models <- paste("model", 1:5, sep="_")
+literals <- paste("literal", 1:15, sep="_")
+sentimentals <- paste("sentimental", 1:15, sep="_")
+images <- paste("image", 1:24, sep="_")
+
+cnames <- c(cats, models, literals, sentimentals, images)
+
+rownames(closest_eucl) <- colnames(dist_df_eucl)[!endsWith(colnames(dist_df_eucl), "category")]
+colnames(closest_eucl) <- cnames
+
+rownames(closest_cos) <- colnames(dist_df_cos)[!endsWith(colnames(dist_df_cos), "category")]
+colnames(closest_cos) <- cnames
+```
+
+
+```{r}
+# Next, find a heuristic to determine whether an entry is correct:
+# Category: is in three most similar cats (related to target cat)
+# Model: is equal to target furnishing, in same category, or in nearest adjacent category.
+# Literal: is equal to target furnishing or the guessed furnishing is among the five most related furnishings
+# Sentimental: is equal to target furnishing or the guessed furnishing is among the five most related furnishings
+# Image: is equal to target furnishing or the guessed furnishing is among the five most related furnishings or in the correct category.
+check_category <- function(rn, entry) {
+  if(entry=="ja sers"){
+    1
+  } else {
+    0
+  }
+}
+
+for (c in cats){
+  eval_eucl[c] <- check_category(rownames(closest_eucl[c]), closest_eucl[c])
+}
+
+
+
+
 ```
 
 
