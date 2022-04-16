@@ -282,6 +282,21 @@ colnames(t_tests_comp) <- stat_columns_comp
 write.csv(t_tests,"surfaceStats.csv", row.names=FALSE)
 write.csv(t_tests_comp,"surfaceStats_comp.csv", row.names=FALSE)
 ```
+```{r}
+library(GGally)
+library(dplyr)
+library(plotly);
+library(htmlwidgets);
+
+# num_st <- joined_stats[,-c(1,2,33,38:43,47,48)]
+num_st <- joined_stats[,c(3:6,36,32)]
+pairs <- ggpairs(num_st,
+                 aes(colour=mode),
+                 upper = list(combo = "box_no_facet"),
+                 lower = list(combo = "dot_no_facet"))
+saveWidget(ggplotly(pairs), file = "interactive_affect.html");
+
+```
 
 
 ```{r}
@@ -346,6 +361,8 @@ for (title in annotator_vars_nonNumeric){
 Next, we're evaluating the automatic tag generation:
 ```{r}
 library(readr)
+library(ggpubr)
+
 models <- read_delim("models.csv", delim = "\t", escape_double = FALSE, trim_ws = TRUE, show_col_types = FALSE)
 models$autoTags <- strsplit(models$autoTags, ",")
 models$tags <- strsplit(models$tags, ",")
@@ -404,30 +421,35 @@ boxplot(round(models$autoTags_accuracy,2), round(models$autoTags_F1, 2),
   text(x=2.5, y=fivenum(round(models$autoTags_F1, 2)),labels=fivenum(round(models$autoTags_F1, 2)), font=2)
   dev.off()
 
+  
 # Plot Precision / Recall distribution over all categories 
-png("plots/autoTags_precision_vs_recall.png", 1000, 1000, type = 'cairo')
+png("plots/autoTags_precision_vs_recall.png", 1200, 1000, type = 'cairo')
 par(mar=c(5,6,4,2) + 0.1)
-plot(round(models$autoTags_P,2), round(models$autoTags_R, 2),
-    main = "autoTags, precision vs. recall",
-    names = c("P","R"),
-    xlab = "P",
-    ylab = "R",
-    xlim = c(0,1),
-    ylim = c(0,1),
-    col=factor(models$category),
-    pch = c(15,17,19),
-    cex.axis = 2.5,
-    cex.main = 3,
-    cex.lab = 2.5,
-    cex=2)
 
-lines(lowess(data.frame(models$autoTags_P, models$autoTags_R, f=2)), col = "black", lty = 5, lwd = 3)
+ggscatter(
+  models, 
+  x = "autoTags_P", 
+  xlab= "precision",
+  y = "autoTags_R",
+  ylab="recall",
+  title = "autoTags, precision vs. recall",
+  color = "category",
+  size = 4,
+  alpha = 0.9,
+  palette = coul_16,
+  margin.params = list(fill = "category", color = "black", size = 1),
+  font.tickslab = c(axisLabelSize*12, "plain"),
+  font.x = c(axisLabelSize*16, "plain"),
+  font.y = c(axisLabelSize*16, "plain"),
+  font.title = c(titleSize*22, "bold"),
+  font.subtitle = c(titleSize*14, "plain"),
+  font.legend = c(axisLabelSize*16, "plain"),
+  legend="right",
+  add = "reg.line",
+  add.params = list(linetype="dashed")
+) + 
+  geom_smooth(color=coul[3], fill="lightgray")
 
-legend("bottomright",
-       legend = levels(factor(models$category)),
-       pch = c(15,17,19),
-       cex=2,
-       col=factor(levels(factor(models$category))))
 par(mar=c(5,4,4,2) + 0.1)
 dev.off() 
 
@@ -541,6 +563,7 @@ names(t_tests) <- cols
 write.csv(t_tests,"autoTagsEvaluation.csv", row.names=FALSE)
 
 ```
+
 ```{r}
 library(dplyr)
 library(ggpubr)
@@ -1164,6 +1187,7 @@ title(xlab = "furnishing category", cex.lab = labelSize, line = 14)
 title(ylab = "euclidean distance", cex.lab = labelSize, line = 6)
 dev.off()
 ```
+
 ```{r}
 cos_stats <- data.frame(matrix(ncol = 7, nrow = 0))
 eucl_stats <- data.frame(matrix(ncol = 7, nrow = 0))
@@ -1535,6 +1559,8 @@ colnames(closest_cos) <- cnames
 # Sentimental: is equal to target furnishing or the guessed furnishing is among the five most related furnishings
 # Image: is equal to target furnishing or the guessed furnishing is among the five most related furnishings or in the correct category.
 check_category <- function(rn, entry) {
+  
+  print(rn)
   if(entry=="ja sers"){
     1
   } else {
