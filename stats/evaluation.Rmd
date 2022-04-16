@@ -72,10 +72,21 @@ modes = c("literal","sentimental")
 
 all_columns <- append(stat_columns,c(literal_names,sentimental_names,summary_names),1)
 
+annotators$firstLanguage<-replace(annotators$firstLanguage, annotators$firstLanguage%in%c("de","deutsch","Deutsch"), "DE")
+annotators$firstLanguage<-replace(annotators$firstLanguage, annotators$firstLanguage=="portugiesisch", "PT")
+annotators$firstLanguage<-replace(annotators$firstLanguage, annotators$firstLanguage=="Arabisch", "AR")
+
+annotators$nationality<-replace(annotators$nationality, annotators$nationality%in%c("de","deutsch","Deutsch"), "DE")
+annotators$nationality<-replace(annotators$nationality, annotators$nationality=="Israelisch", "IL")
+annotators$nationality<-replace(annotators$nationality, annotators$nationality=="Ã–sterreichisch", "AT")
+
+annotators$lineOfWork<-replace(annotators$lineOfWork, annotators$lineOfWork=="it", "IT")
+
 annotator_vars <- names(annotators)[4:15]
 annotator_vars_numeric <- names(annotators)[c(4,11,12,13)]
 annotator_vars_nonNumeric <- names(annotators)[c(5,6,7,8,9,10,14,15)]
 annotator_stats <- data.frame()
+
 description_vars <- c("spelling_errors",
                       "sentiment",
                       names(literal_stats)[3:31], 
@@ -288,29 +299,33 @@ library(dplyr)
 library(plotly);
 library(htmlwidgets);
 
-# num_st <- joined_stats[,-c(1,2,33,38:43,47,48)]
-num_st <- joined_stats[,c(3:6,36,32)]
-pairs <- ggpairs(num_st,
-                 aes(colour=mode),
-                 upper = list(combo = "box_no_facet"),
+# plot affective variables
+st <- joined_stats[,c(3:6,36,32)]
+pairs <- ggpairs(st,
+                 aes(colour=mode, alpha = 0.5),
                  lower = list(combo = "dot_no_facet"))
-saveWidget(ggplotly(pairs), file = "interactive_affect.html");
+saveWidget(ggplotly(pairs), file = "interactive/affect.html");
+
+# plot numeric demography variables
+st <- joined_stats[,c(37,44:46,38)]
+pairs <- ggpairs(st,
+                 aes(colour=gender, alpha = 0.5),
+                 lower = list(combo = "dot_no_facet"))
+saveWidget(ggplotly(pairs), file = "interactive/demographics.html");
+
+# plot first language
+st <- joined_stats[,c(22,34:37,40)]
+pairs <- ggpairs(st,
+                 aes(colour=firstLanguage, alpha = 0.5),
+                 lower = list(combo = "dot_no_facet"))
+saveWidget(ggplotly(pairs), file = "interactive/readability.html");
+
+
 
 ```
 
 
 ```{r}
-annotators$firstLanguage<-replace(annotators$firstLanguage, annotators$firstLanguage%in%c("de","deutsch","Deutsch"), "DE")
-annotators$firstLanguage<-replace(annotators$firstLanguage, annotators$firstLanguage=="portugiesisch", "PT")
-annotators$firstLanguage<-replace(annotators$firstLanguage, annotators$firstLanguage=="Arabisch", "AR")
-
-annotators$nationality<-replace(annotators$nationality, annotators$nationality%in%c("de","deutsch","Deutsch"), "DE")
-annotators$nationality<-replace(annotators$nationality, annotators$nationality=="Israelisch", "IL")
-annotators$nationality<-replace(annotators$nationality, annotators$nationality=="Ã–sterreichisch", "AT")
-
-annotators$lineOfWork<-replace(annotators$lineOfWork, annotators$lineOfWork=="it", "IT")
-
-
 for (title in annotator_vars_numeric){
   column <- annotators[,title]
   png(sprintf("plots/%s.png",title), 600, 600, type = 'cairo')
