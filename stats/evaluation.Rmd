@@ -208,20 +208,7 @@ for (title in description_vars){
                position=position_nudge(x=0.2), size=2.5)
   ggsave(sprintf("plots/%s.png",title), plot = box)
   saveWidget(ggplotly(box), file = sprintf("interactive/%s.html", title))
-  # par(mar=plotMargins) 
-  # boxplot(round(literalColumn,2), round(sentimentalColumn, 2),
-  #   main = sprintf("%s, literal vs. sentimental descriptions", title),
-  #   names = c("literal","sentimental"),
-  #   col = coul,
-  #   bg=coul,
-  #   pch=21,
-  #   border = bord,
-  #   cex.axis = axisLabelSize,
-  #   cex.main = titleSize)
-  # text(x=1.5, y=fivenum(round(literalColumn,2)),labels=fivenum(round(literalColumn,1)), cex = 0.8 * axisLabelSize)
-  # text(x=2.5, y=fivenum(round(sentimentalColumn, 2)),labels=fivenum(round(sentimentalColumn, 1)), cex = 0.8 * axisLabelSize)
-  # title(xlab = "description mode", ylab = title, cex.lab = labelSize, line = 4.5)
-  # dev.off()
+
   t <- t.test(literalColumn, sentimentalColumn)
   c <- cor.test(literalColumn, sentimentalColumn)
   summary_literal <- c(summary(literalColumn),sd(literalColumn),var(literalColumn))
@@ -260,73 +247,37 @@ for (title in description_vars){
 
     if(any(t_tests_comp$variable == title_comp & t_tests_comp$variable_comp == title)){
       next
-    }    
-    # png(sprintf("plots/%s_vs_%s.png",title,title_comp), 1200, 1200, type = 'cairo')
-    # par(mar=plotMargins) 
-    # pairs(data.frame(joined_stats[title],joined_stats[title_comp]),
-    #   col = mode_colors,
-    #   pch=mode_shapes,
-    #   cex=1.5,
-    #   las=1,
-    #   cex.axis = axisLabelSize,
-    #   cex.main = titleSize,
-    #   cex.labels = labelSize,
-    #   panel = modePanel,
-    #   oma=plotMargins)
-    # 
-    # title(main = sprintf("%s vs. %s", title, title_comp), cex.main=titleSize, line = 6.5)
-    # 
-    # if((abs(c_literal$estimate)>0.3)||(abs(c_literal$estimate)>0.3)){
-    #   legendLevels <- levels(factor(joined_stats$mode))
-    #   legendLevels[1] <- sprintf("%s, r = %.2f",legendLevels[1],c_literal$estimate)
-    #   legendLevels[2] <- sprintf("%s, r = %.2f",legendLevels[2],c_sentimental$estimate)
-    #   
-    #   legend("center",
-    #   legend = legendLevels,
-    #   pch = c(15,19),
-    #   cex=legendLabelSize,
-    #   pt.cex = 3,
-    #   col = c(coul[2], coul[1]),
-    #   text.col = "white",
-    #   text.width = 1.5 * legendLabelSize * strwidth(legendLevels)[1])
-    #   
-    #   legend("center",
-    #   legend = legendLevels,
-    #   cex=legendLabelSize,
-    #   pt.cex = 3,
-    #   col = "black",
-    #   lty = c(2,3),
-    #   lwd = 3,
-    #   bty="n",
-    #   text.col = "black",
-    #   text.width = 1.5 * legendLabelSize * strwidth(legendLevels)[1]
-    #   )
-    #   
-    # 
-    # }else{
-    #   legend("center",
-    #   legend = levels(factor(joined_stats$mode)),
-    #   pch = c(15,19),
-    #   cex=legendLabelSize,
-    #   col = c(coul[2], coul[1]))
-    # }
-    # dev.off()
+    }
+
+
+  st <- joined_stats[,c(colnames(joined_stats)==title | colnames(joined_stats)==title_comp | colnames(joined_stats)=="mode")]
+  pairs <- ggpairs(st,
+                   aes(colour=mode, alpha = 0.5),
+                   lower = list(combo = "dot_no_facet")) + 
+           scale_colour_manual(values = coul) + 
+           scale_fill_manual(values = coul)
+  ggsave(sprintf("plots/%s_vs_%s.png",title,title_comp), plot = pairs)
+  saveWidget(ggplotly(pairs), file = sprintf("interactive/%s_vs_%s.html",title,title_comp));
   }
 }
 # Special treatment for timings since we've recorded them independent of the description mode.
-png("plots/timeTaken.png", 1000, 1000, type = 'cairo')
-par(mar=plotMargins) 
-boxplot(round(literal_stats$timeTaken,1),
-    main = "timeTaken",
-    ylab = "timeTaken (seconds)",
-    col = coul,
-    bg=coul,
-    border = bord,
-    cex.axis = axisLabelSize,
-    cex.main = titleSize,
-    cex.lab = labelSize)
-  text(x=1.25, y=fivenum(round(literal_stats$timeTaken,1)),labels=fivenum(round(literal_stats$timeTaken,1)), font=2, cex = 0.8 * axisLabelSize)
-dev.off()
+  box <- ggviolin(literal_stats$timeTaken, 
+                   palette=coul,
+                   fill=coul[1],
+                   alpha=0.5,
+                   draw_quantiles=TRUE,
+                   title = "timeTaken",
+                   ylab = "time taken (seconds)",
+                   add = c("boxplot"), 
+                   add.params = list(alpha=0.75),
+                   ) +
+  stat_summary(geom="text", fun.y=quantile,
+               aes(label=sprintf("%1.2f", ..y..)),
+               position=position_nudge(x=0.2), size=2.5) +
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+  ggsave("plots/timeTaken.png", plot = box)
+  saveWidget(ggplotly(box), file = "interactive/timeTaken.html")
 
 colnames(t_tests)=all_columns
 colnames(t_tests_comp) <- stat_columns_comp
