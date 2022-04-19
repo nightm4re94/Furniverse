@@ -9,18 +9,21 @@ literal_stats <- read.table("literal_stats.csv", sep = '\t', header= TRUE)[1:31]
 sentimental_stats <- read.table("sentimental_stats.csv", sep = '\t', header= TRUE)[1:31]
 annotators <- read.table("annotators.csv", sep = '\t', header= TRUE, encoding = "utf-8")
 embeddings <- read.table("embeddings.csv", sep = '\t', header= TRUE, encoding = "utf-8", row.names = 1)
-
+feedback <- read.table("feedback.csv", sep = '\t', header= TRUE, encoding = "utf-8", row.names = 1)
 ```
 
 Next, we define plot color spaces and sizes.
 ```{r}
 library(colorspace)
+library(RColorBrewer)
+
 coul <- c("#FFC20A","#0C7BDC","#A72608","#134611")
 fill <- adjustcolor(coul,alpha=0.8)
 bord <- sapply(sapply(coul, darken), darken)
-library(RColorBrewer)
 barPal <- brewer.pal(12,"Set3")
 barPalBord <- sapply(sapply(barPal, darken), darken)
+
+coul_div <- brewer.pal(5, "Spectral")
 
 # These 16 colors are taken from https://sashamaps.net/docs/resources/20-colors/, with an accessibility of 99% and excluding black / white.
 coul_16 <- c('#e6194B', 
@@ -131,15 +134,15 @@ modePanel <- function (x, y, col = par("col"), bg = NA, pch = par("pch"),
     cex = 1, col.smooth = 2, span = 2/3, iter = 3, ...) 
 {
     points(x, y, pch = pch, col = col, bg = bg, cex = cex, xlab = names(x), ylab = names(y))
-    ok <- is.finite(x) & is.finite(y)
+    ok = is.finite(x) & is.finite(y)
     
     # Plot smoothing lines if there is at least a weak correlation (r>0.3)
     if((abs(c_literal$estimate)>0.3)||(abs(c_literal$estimate)>0.3)){
-      literalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="literal"), which(ok)))
+      literalLineIndices = Reduce(intersect, list(which(joined_stats$mode=="literal"), which(ok)))
       lines(lowess(data.frame(x[literalLineIndices],
                             y[literalLineIndices], f=3)),
                             col = "black", lty = 2, lwd = 3)
-      sentimentalLineIndices <- Reduce(intersect, list(which(joined_stats$mode=="sentimental"), which(ok)))
+      sentimentalLineIndices = Reduce(intersect, list(which(joined_stats$mode=="sentimental"), which(ok)))
       lines(lowess(data.frame(x[sentimentalLineIndices],
                             y[sentimentalLineIndices], f=3)),
                             col = "black", lty=3, lwd = 3)
@@ -177,16 +180,16 @@ t_tests <- data.frame(matrix(nrow=0, ncol = length(all_columns)))
 t_tests_comp <- data.frame(matrix(nrow=0, ncol = 6))
 
 for (title in description_vars){
-  literalVariableName <- sprintf("%s_literal", title)
-  sentimentalVariableName <- sprintf("%s_sentimental", title)
-  literalColumn <- literal_stats[,title]
-  sentimentalColumn <- sentimental_stats[,title]
+  literalVariableName = sprintf("%s_literal", title)
+  sentimentalVariableName = sprintf("%s_sentimental", title)
+  literalColumn = literal_stats[,title]
+  sentimentalColumn = sentimental_stats[,title]
 
   if(!title %in% annotator_vars_numeric&&title!="timeTaken"){
     
   # plot affective variables
-  st <- joined_stats[,colnames(joined_stats)==title | colnames(joined_stats)=="mode"]
-  box <- ggviolin(joined_stats, 
+  st = joined_stats[,colnames(joined_stats)==title | colnames(joined_stats)=="mode"]
+  box = ggviolin(joined_stats, 
                    x="mode", 
                    y=title,
                    fill="mode",
@@ -209,18 +212,18 @@ for (title in description_vars){
   ggsave(sprintf("plots/%s.png",title), plot = box)
   saveWidget(ggplotly(box), file = sprintf("interactive/%s.html", title))
 
-  t <- t.test(literalColumn, sentimentalColumn)
-  c <- cor.test(literalColumn, sentimentalColumn)
-  summary_literal <- c(summary(literalColumn),sd(literalColumn),var(literalColumn))
-  summary_sentimental <- c(summary(sentimentalColumn),sd(sentimentalColumn),var(sentimentalColumn))
-  summary_joint <- c(summary(joined_stats[,title]),sd(joined_stats[,title]),var(joined_stats[,title]))
+  t = t.test(literalColumn, sentimentalColumn)
+  c = cor.test(literalColumn, sentimentalColumn)
+  summary_literal = c(summary(literalColumn),sd(literalColumn),var(literalColumn))
+  summary_sentimental = c(summary(sentimentalColumn),sd(sentimentalColumn),var(sentimentalColumn))
+  summary_joint = c(summary(joined_stats[,title]),sd(joined_stats[,title]),var(joined_stats[,title]))
 
   names(summary_literal)=literal_names
   names(summary_sentimental)=sentimental_names
   names(summary_joint)=summary_names
 
   stat_vector = c(title,t$statistic,t$p.value,c$estimate,c$p.value)
-  stat_vector <- append(stat_vector,c(summary_literal,summary_sentimental,summary_joint),1)
+  stat_vector = append(stat_vector,c(summary_literal,summary_sentimental,summary_joint),1)
   names(stat_vector)  <-  all_columns
 
   t_tests <- rbind(t_tests, stat_vector)
@@ -230,17 +233,17 @@ for (title in description_vars){
     if (title == title_comp) {
       next
     }
-    literalColumn_comp <- literal_stats[,title_comp]
-    sentimentalColumn_comp <- sentimental_stats[,title_comp]
-    t_literal <- t.test(literalColumn, literalColumn_comp)
-    c_literal <- cor.test(literalColumn, literalColumn_comp)
+    literalColumn_comp = literal_stats[,title_comp]
+    sentimentalColumn_comp = sentimental_stats[,title_comp]
+    t_literal = t.test(literalColumn, literalColumn_comp)
+    c_literal = cor.test(literalColumn, literalColumn_comp)
 
-    t_sentimental <- t.test(sentimentalColumn, sentimentalColumn_comp)
-    c_sentimental <- cor.test(sentimentalColumn, sentimentalColumn_comp)
+    t_sentimental = t.test(sentimentalColumn, sentimentalColumn_comp)
+    c_sentimental = cor.test(sentimentalColumn, sentimentalColumn_comp)
     stat_vector_comp = c(title, title_comp,
                          t_literal$statistic, t_literal$p.value, c_literal$estimate, c_literal$p.value,
                          t_sentimental$statistic, t_sentimental$p.value, c_sentimental$estimate, c_sentimental$p.value)
-    names(stat_vector_comp) <- stat_columns_comp
+    names(stat_vector_comp) = stat_columns_comp
     
     t_tests_comp <- rbind(t_tests_comp, stat_vector_comp)
     colnames(t_tests_comp) <- stat_columns_comp
@@ -250,8 +253,8 @@ for (title in description_vars){
     }
 
 
-  st <- joined_stats[,c(colnames(joined_stats)==title | colnames(joined_stats)==title_comp | colnames(joined_stats)=="mode")]
-  pairs <- ggpairs(st,
+  st = joined_stats[,c(colnames(joined_stats)==title | colnames(joined_stats)==title_comp | colnames(joined_stats)=="mode")]
+  pairs = ggpairs(st,
                    aes(colour=mode, alpha = 0.5),
                    lower = list(combo = "dot_no_facet")) + 
            scale_colour_manual(values = coul) + 
@@ -261,7 +264,7 @@ for (title in description_vars){
   }
 }
 # Special treatment for timings since we've recorded them independent of the description mode.
-  box <- ggviolin(literal_stats$timeTaken, 
+  box = ggviolin(literal_stats$timeTaken, 
                    palette=coul,
                    fill=coul[1],
                    alpha=0.5,
@@ -284,6 +287,7 @@ colnames(t_tests_comp) <- stat_columns_comp
 write.csv(t_tests,"surfaceStats.csv", row.names=FALSE)
 write.csv(t_tests_comp,"surfaceStats_comp.csv", row.names=FALSE)
 ```
+
 ```{r}
 library(GGally)
 library(dplyr)
@@ -291,8 +295,8 @@ library(plotly)
 library(htmlwidgets)
 
 # plot affective variables
-st <- joined_stats[,c(3:6,36,32)]
-pairs <- ggpairs(st,
+st = joined_stats[,c(3:6,36,32)]
+pairs = ggpairs(st,
                  aes(colour=mode, alpha = 0.5),
                  lower = list(combo = "dot_no_facet")) + 
          scale_colour_manual(values = coul) + 
@@ -300,8 +304,8 @@ pairs <- ggpairs(st,
 saveWidget(ggplotly(pairs), file = "interactive/affect.html");
 
 # plot numeric demography variables
-st <- joined_stats[,c(37,44:46,38)]
-pairs <- ggpairs(st,
+st = joined_stats[,c(37,44:46,38)]
+pairs = ggpairs(st,
                  aes(colour=gender, alpha = 0.5),
                  lower = list(combo = "dot_no_facet")) + 
          scale_colour_manual(values = coul) + 
@@ -309,22 +313,20 @@ pairs <- ggpairs(st,
 saveWidget(ggplotly(pairs), file = "interactive/demographics.html");
 
 # plot first language
-st <- joined_stats[,c(22,34:37,40)]
-pairs <- ggpairs(st,
+st = joined_stats[,c(22,34:37,40)]
+pairs = ggpairs(st,
                  aes(colour=firstLanguage, alpha = 0.5),
                  lower = list(combo = "dot_no_facet")) + 
          scale_colour_manual(values = coul) + 
          scale_fill_manual(values = coul)
 saveWidget(ggplotly(pairs), file = "interactive/readability.html");
 
-
-
 ```
 
 
 ```{r}
 for (title in annotator_vars_numeric){
-  column <- annotators[,title]
+  column = annotators[,title]
   png(sprintf("plots/%s.png",title), 600, 600, type = 'cairo')
   par(mar=c(2,5,4,2) + 0.1) 
   boxplot(column,
@@ -339,14 +341,14 @@ for (title in annotator_vars_numeric){
     cex.lab = 2.0)
   text(x=1.3, y=fivenum(column),labels=fivenum(column), cex=1.5, font=2)
   dev.off()
-  summary <- summary(column)
+  summary = summary(column)
   annotator_stats <- rbind(annotator_stats, summary)
 }
 
 library(plyr)
 for (title in annotator_vars_nonNumeric){
-  column <- annotators[,title]
-  max <- round_any(max(matrix(table(column))[,1]), 5, f = ceiling) 
+  column = annotators[,title]
+  max = round_any(max(matrix(table(column))[,1]), 5, f = ceiling) 
   png(sprintf("plots/%s.png",title), 1000, 650, type = 'cairo')
   par(mar=c(5,30,4,2) + 0.1) # Add space to left margin.
   barplot(table(column)[order(table(column),decreasing = TRUE)],
@@ -382,14 +384,14 @@ models[c("autoTags_TP","autoTags_FP","autoTags_FN","autoTags_TN",
          "autoTags_total","autoTags_accuracy",
          "autoTags_P","autoTags_R","autoTags_F1")] <- 0
 for(i in 1:nrow(models)){
-  cat <- models[i, ]$category
-  autoTags <- unlist(models[i, ]$autoTags)
-  autoTags <- data.frame(t(sapply(strsplit(autoTags, ":"),c)))
-  names(autoTags) <- c("tag","conf")
+  cat = models[i, ]$category
+  autoTags = unlist(models[i, ]$autoTags)
+  autoTags = data.frame(t(sapply(strsplit(autoTags, ":"),c)))
+  names(autoTags) = c("tag","conf")
   
-  autoTags$conf <- as.numeric(autoTags$conf)
-  autoTags <- autoTags[autoTags$conf>10,]
-  tags <- unlist(models[i, ]$tags)
+  autoTags$conf = as.numeric(autoTags$conf)
+  autoTags = autoTags[autoTags$conf>10,]
+  tags = unlist(models[i, ]$tags)
   # True Positives: predicted tags that are in the manual tag list, equal to the category name, or have above 90% confidence.
   models[i,]$autoTags_TP <- length(which(autoTags$tag%in%tags | autoTags$tag==cat | autoTags$conf>=90))
   # False Positives: predicted tags that are not in the manual tag list, inequal to the category name, and have between 80% and 90% confidence.
@@ -531,34 +533,34 @@ grid(ny=NA, col = adjustcolor("black", alpha=0.3), lty = 2, lwd = 1)
 title(xlab = "F1-score", cex.lab = 2, line = 4.5)
 dev.off()
 
-cols <- c("cat1", "cat2", 
+cols = c("cat1", "cat2", 
           "precision_mean_cat1", "precision_mean_cat2",
           "recall_mean_cat1", "recall_mean_cat2",
           "f1_mean_cat1", "f1_mean_cat2",
           "precision_t", "precision_p(t)",
           "recall_t", "recall_p(t)",
           "f1_t", "f1_p(t)")
-t_tests <- data.frame(matrix(nrow=0, ncol = length(cols)))
-names(t_tests) <- cols
+t_tests = data.frame(matrix(nrow=0, ncol = length(cols)))
+names(t_tests) = cols
 
 for(i in 1:length(levels(factor(models$category)))){
-  var <- levels(factor(models$category))[i]
-  other_vars <- levels(factor(models$category))[-i]
+  var = levels(factor(models$category))[i]
+  other_vars = levels(factor(models$category))[-i]
   for(j in 1: length(other_vars)){
-    other_var <- other_vars[j]
-    cat1 <- models$category==var
-    cat2 <- models$category==other_var
-    precision_mean1 <-  mean(models$autoTags_P[cat1])
-    precision_mean2 <-  mean(models$autoTags_P[cat2])
-    precision_t <- t.test(models$autoTags_P[cat1], models$autoTags_P[cat2])
+    other_var = other_vars[j]
+    cat1 = models$category==var
+    cat2 = models$category==other_var
+    precision_mean1 =  mean(models$autoTags_P[cat1])
+    precision_mean2 =  mean(models$autoTags_P[cat2])
+    precision_t = t.test(models$autoTags_P[cat1], models$autoTags_P[cat2])
 
-    recall_mean1 <-  mean(models$autoTags_R[cat1])
-    recall_mean2 <-  mean(models$autoTags_R[cat2])
-    recall_t <- t.test(models$autoTags_R[cat1], models$autoTags_R[cat2])
+    recall_mean1 =  mean(models$autoTags_R[cat1])
+    recall_mean2 =  mean(models$autoTags_R[cat2])
+    recall_t = t.test(models$autoTags_R[cat1], models$autoTags_R[cat2])
 
-    f1_mean1 <-  mean(models$autoTags_F1[cat1])
-    f1_mean2 <-  mean(models$autoTags_F1[cat2])
-    f1_t <- t.test(models$autoTags_F1[cat1], models$autoTags_F1[cat2])
+    f1_mean1 =  mean(models$autoTags_F1[cat1])
+    f1_mean2 =  mean(models$autoTags_F1[cat2])
+    f1_t = t.test(models$autoTags_F1[cat1], models$autoTags_F1[cat2])
 
     stat_vector = c(var, other_var,
                     precision_mean1, precision_mean2,
@@ -585,10 +587,10 @@ categories <- c("bed", "bench", "cabinet", "chair", "chest", "couch", "decoratio
 dim_names <- c("Dim.1", "Dim.2")
 
 
-all_models <- levels(factor(sub("_.*", "", rownames(embeddings)[grepl("-",rownames(embeddings), fixed = TRUE)])))
+all_models = levels(factor(sub("_.*", "", rownames(embeddings)[grepl("-",rownames(embeddings), fixed = TRUE)])))
 for(model in all_models){
-  means <- as.data.frame(t(colMeans(embeddings[grepl(model,rownames(embeddings), fixed = TRUE), ])))
-  rownames(means) <- sprintf("%s_mean", model)
+  means = as.data.frame(t(colMeans(embeddings[grepl(model,rownames(embeddings), fixed = TRUE), ])))
+  rownames(means) = sprintf("%s_mean", model)
   embeddings <- rbind(embeddings, means)
 }
 
@@ -599,15 +601,15 @@ literal_embeddings <- embeddings[grepl("literal",rownames(embeddings), fixed = T
 sentimental_embeddings <- embeddings[grepl("sentimental",rownames(embeddings), fixed = TRUE),]
 model_embeddings <- embeddings[endsWith(rownames(embeddings), "mean"),]
 ```
+
 Compute euclidean distance and cosine dissimilarity matrices, then apply multidimensional scaling. This step takes a few minutes.
 ```{r}
 embeddings_dist_eucl <- dist(embeddings, diag=FALSE, upper=FALSE)
 
-embeddings_matrix <- as.matrix(embeddings)
-embeddings_sim <- embeddings_matrix / sqrt(rowSums(embeddings_matrix * embeddings_matrix))
-embeddings_sim <- embeddings_sim %*% t(embeddings_sim)
+embeddings_matrix = as.matrix(embeddings)
+embeddings_sim = embeddings_matrix / sqrt(rowSums(embeddings_matrix * embeddings_matrix))
+embeddings_sim = embeddings_sim %*% t(embeddings_sim)
 embeddings_dist_cos <- as.dist(1 - embeddings_sim, diag = FALSE, upper = FALSE)
-rm(embeddings_matrix, embeddings_sim)
 
 # Apply Multidimensional Scaling (MDS)
 total_mds_eucl <-  as.data.frame(cmdscale(embeddings_dist_eucl))
@@ -648,6 +650,7 @@ model_mds_cos <- total_mds_cos[total_mds_cos$type=="mean",]
 ```
 
 ```{r}
+library(dplyr)
 # K-means clustering
 image_clust_eucl <- kmeans(image_mds_eucl[,1:2], length(categories))$cluster %>% as.factor()
 literal_clust_eucl <- kmeans(literal_mds_eucl[,1:2], length(categories))$cluster %>% as.factor()
@@ -1237,6 +1240,7 @@ embeddings <- embeddings %>% select("category", everything()) %>% select("type",
 ```
 
 ```{r}
+library(tidyr)
 prototype_embeddings <- data.frame(matrix(ncol = ncol(embeddings)-2, nrow = 0))
 
 for (cat in categories){
@@ -1470,6 +1474,7 @@ ggscatter(
 dev.off()
 
 ```
+
 We need to validate whether the embeddings distances actually match the categorization and can distinguish between furnishings:
 ```{r}
 library(ProcMod)
@@ -1570,24 +1575,57 @@ colnames(closest_cos) <- cnames
 # Literal: is equal to target furnishing or the guessed furnishing is among the five most related furnishings
 # Sentimental: is equal to target furnishing or the guessed furnishing is among the five most related furnishings
 # Image: is equal to target furnishing or the guessed furnishing is among the five most related furnishings or in the correct category.
-check_category <- function(rn, entry) {
-  
-  print(rn)
-  if(entry=="ja sers"){
-    1
-  } else {
-    0
+for (r in rownames(closest_eucl)){
+  print(r)
+}
+```
+
+
+Process the annotator feedback:
+```{r}
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(tidyr)
+library(scales)
+library(ggmosaic)
+library(htmlwidgets)
+library(GGally)
+library(plotly)
+
+numeric.feedback <- feedback[,-c(1:3,23:25)]
+
+feedback.r <- data.frame(matrix(ncol = 5, nrow = length(colnames(numeric.feedback))))
+rownames(feedback.r) <- colnames(numeric.feedback)
+colnames(feedback.r) <- 1:5
+
+for (col in colnames(numeric.feedback)){
+  for(ans in 1:5){
+    feedback.r[col,ans] = length(which(numeric.feedback[,col]==ans))
   }
 }
 
-for (c in cats){
-  eval_eucl[c] <- check_category(rownames(closest_eucl[c]), closest_eucl[c])
-}
+r2 <- feedback.r %>% 
+  add_rownames(var = "question") %>%
+  pivot_longer(!question, names_to = "answer", values_to = "count")
 
-
-
+bars <- ggplot(r2,
+       aes(x = question,
+           y = count,
+           fill = answer)) +
+  labs(title = "Annotator feedback",
+       xlab = "agreement") +
+  geom_bar(position = "fill", stat = "identity") +
+  scale_y_continuous(labels = scales::percent_format())+
+  coord_flip()+
+  scale_y_reverse(labels=c("100%","75%","50%","25%","0%"))+
+  scale_x_discrete(limits = rev(colnames(numeric.feedback)))+
+  scale_fill_manual(values = coul_div)
+ggsave("plots/feedback.png", plot = bars)
+saveWidget(ggplotly(bars), file = "interactive/feedback.html")
 
 ```
+
 
 
 
