@@ -298,49 +298,96 @@ library(htmlwidgets)
 st = joined_stats[,c(3:6,36,32)]
 pairs = ggpairs(st,
                  aes(colour=mode, alpha = 0.5),
-                 lower = list(combo = "dot_no_facet")) + 
+                 lower = list(combo = "dot_no_facet"),
+                 upper = list(continuous = wrap("cor", size = 2, colour = "black"))) + 
          scale_colour_manual(values = coul) + 
-         scale_fill_manual(values = coul)
+         scale_fill_manual(values = coul) 
+
+theme <- theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1))
+
+pairs[6,1] <- pairs[6,1] + theme
+pairs[6,2] <- pairs[6,2] + theme
+pairs[6,3] <- pairs[6,3] + theme
+pairs[6,4] <- pairs[6,4] + theme
+pairs[6,5] <- pairs[6,5] + theme
+pairs[6,6] <- pairs[6,6] + theme
+
+ggsave("plots/affect.png", plot = pairs)
 saveWidget(ggplotly(pairs), file = "interactive/affect.html");
 
 # plot numeric demography variables
 st = joined_stats[,c(37,44:46,38)]
 pairs = ggpairs(st,
-                 aes(colour=gender, alpha = 0.5),
-                 lower = list(combo = "dot_no_facet")) + 
+                aes(colour=gender, alpha = 0.5),
+                columnLabels = c("age \n(years)", "income \n(€ p.A.)", "household \nsize \n(persons)","living area \n(m^2)","gender"),                 lower = list(combo = "dot_no_facet"),
+                upper = list(continuous = wrap("cor", size = 3, colour = "black"))) + 
          scale_colour_manual(values = coul) + 
-         scale_fill_manual(values = coul)
+         scale_fill_manual(values = coul) 
+
+theme <- theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1))
+
+pairs[5,1] <- pairs[5,1] + theme
+pairs[5,2] <- pairs[5,2] + theme
+pairs[5,3] <- pairs[5,3] + theme
+pairs[5,4] <- pairs[5,4] + theme
+pairs[5,5] <- pairs[5,5] + theme
+
+ggsave("plots/demographics.png", plot = pairs)
 saveWidget(ggplotly(pairs), file = "interactive/demographics.html");
 
-# plot first language
+# plot readability by language
 st = joined_stats[,c(22,34:37,40)]
 pairs = ggpairs(st,
-                 aes(colour=firstLanguage, alpha = 0.5),
-                 lower = list(combo = "dot_no_facet")) + 
+                aes(colour=firstLanguage, alpha = 0.5),
+                lower = list(combo = "dot_no_facet"),
+                upper = list(continuous = wrap("cor", size = 3, colour = "black"))) + 
          scale_colour_manual(values = coul) + 
-         scale_fill_manual(values = coul)
+         scale_fill_manual(values = coul) 
+
+theme <- theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1))
+
+pairs[6,1] <- pairs[6,1] + theme
+pairs[6,2] <- pairs[6,2] + theme
+pairs[6,3] <- pairs[6,3] + theme
+pairs[6,4] <- pairs[6,4] + theme
+pairs[6,5] <- pairs[6,5] + theme
+pairs[6,6] <- pairs[6,6] + theme
+
+ggsave("plots/readability.png", plot = pairs)
 saveWidget(ggplotly(pairs), file = "interactive/readability.html");
 
 ```
 
 
 ```{r}
+library(GGally)
+library(dplyr)
+library(plotly)
+library(htmlwidgets)
+library(ggpubr)
+
 for (title in annotator_vars_numeric){
   column = annotators[,title]
-  png(sprintf("plots/%s.png",title), 600, 600, type = 'cairo')
-  par(mar=c(2,5,4,2) + 0.1) 
-  boxplot(column,
-    main = sprintf("%s distribution", title),
-    ylab = title,
-    col = coul,
-    bg=coul,
-    pch=21,
-    border = bord,
-    cex.axis = 2.0,
-    cex.main = 2.5,
-    cex.lab = 2.0)
-  text(x=1.3, y=fivenum(column),labels=fivenum(column), cex=1.5, font=2)
-  dev.off()
+  
+  box = ggviolin(column, 
+                   palette=coul,
+                   fill=coul[1],
+                   alpha=0.5,
+                   draw_quantiles=TRUE,
+                   title = sprintf("%s distribution", title),
+                   ylab = title,
+                   xlab = "density",
+                   add = c("boxplot"), 
+                   add.params = list(alpha=0.75),
+                   ) +
+  stat_summary(geom="text", fun.y=quantile,
+               aes(label=sprintf("%1.0f", ..y..)),
+               position=position_nudge(x=0.2), size=2.5) +
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+  ggsave(sprintf("plots/%s.png",title), plot = box)
+  saveWidget(ggplotly(box), file = sprintf("interactive/%s.html",title))
+
   summary = summary(column)
   annotator_stats <- rbind(annotator_stats, summary)
 }
@@ -418,29 +465,58 @@ r_total <- tp_total / (tp_total + fn_total)
 f1_total <- 2 * p_total * r_total / (p_total + r_total)
 
 
-# Plot accuracy / F1 distributions over all categories
-png("plots/autoTags_accuracy_vs_F1.png", 800, 800, type = 'cairo')
-boxplot(round(models$autoTags_accuracy,2), round(models$autoTags_F1, 2),
-    main = "autoTags, accuracy vs. F1-score",
-    names = c("accuracy","F1-score"),
-    ylim = c(0,1),
-    col = coul,
-    bg=coul,
-    pch=21,
-    border = bord,
-    cex.axis = 1.5,
-    cex.main = 1.5,
-    cex.lab = 1.5)
-  text(x=1.5, y=fivenum(round(models$autoTags_accuracy,2)),labels=fivenum(round(models$autoTags_accuracy,2)), font=2)
-  text(x=2.5, y=fivenum(round(models$autoTags_F1, 2)),labels=fivenum(round(models$autoTags_F1, 2)), font=2)
-  dev.off()
+# Plot accuracy / precision / recall / F1 distributions over all categories
+p1 = ggpairs(models[,c(18:21)])
+pairs = ggpairs(models[,c(5,18:21)],
+                 aes(color=category, alpha = 0.75),
+                 columnLabels = c("category","accuracy","precision","recall","F1-score"),
+                 showStrips=TRUE,
+                 legend=1,
+                 lower = list(combo = "dot_no_facet")) + 
+                 scale_colour_manual(values = coul_16) + 
+                 scale_fill_manual(values = coul_16)
+
+pairs[5,1] <- pairs[5,1]+
+  theme(axis.text.x = element_text(angle = 90, size = 6, vjust = 0.5, hjust = 1))
+
+pairs[2,3] <- p1[1,2]
+pairs[2,4] <- p1[1,3]
+pairs[2,5] <- p1[1,4]
+
+pairs[3,4] <- p1[2,3]
+pairs[3,5] <- p1[2,4]
+pairs[4,5] <- p1[3,4]
+
+theme <- theme(panel.background = element_rect(fill = 'darkgray'),                                 
+               panel.grid.major = element_line(color = 'white',                                                               
+                                               size = 0),                                  
+               panel.grid.minor = element_line(color = 'white',                                                             
+                                               size = 0))
+pairs[1,1] <- pairs[1,1]+ theme
+pairs[2,1] <- pairs[2,1]+ theme
+pairs[3,1] <- pairs[3,1]+ theme
+pairs[4,1] <- pairs[4,1]+ theme
+pairs[5,1] <- pairs[5,1]+ theme
+
+pairs[2,2] <- pairs[2,2]+ theme
+pairs[3,2] <- pairs[3,2]+ theme + geom_smooth(color=coul[3], fill=coul[4])
+pairs[4,2] <- pairs[4,2]+ theme + geom_smooth(color=coul[3], fill=coul[4])
+pairs[5,2] <- pairs[5,2]+ theme + geom_smooth(color=coul[3], fill=coul[4])
+
+pairs[3,3] <- pairs[3,3]+ theme
+pairs[4,3] <- pairs[4,3]+ theme + geom_smooth(color=coul[3], fill=coul[4])
+pairs[5,3] <- pairs[5,3]+ theme + geom_smooth(color=coul[3], fill=coul[4])
+
+pairs[4,4] <- pairs[4,4]+ theme
+pairs[5,4] <- pairs[5,4]+ theme + geom_smooth(color=coul[3], fill=coul[4])
+
+pairs[5,5] <- pairs[5,5]+ theme
+ggsave("plots/autoTags_eval.png", plot = pairs)
+saveWidget(ggplotly(pairs), file = "interactive/autoTags_eval.html")
 
   
 # Plot Precision / Recall distribution over all categories 
-png("plots/autoTags_precision_vs_recall.png", 1200, 1000, type = 'cairo')
-par(mar=c(5,6,4,2) + 0.1)
-
-ggscatter(
+scatter <- ggscatter(
   models, 
   x = "autoTags_P", 
   xlab= "precision",
@@ -452,20 +528,15 @@ ggscatter(
   alpha = 0.9,
   palette = coul_16,
   margin.params = list(fill = "category", color = "black", size = 1),
-  font.tickslab = c(axisLabelSize*12, "plain"),
-  font.x = c(axisLabelSize*16, "plain"),
-  font.y = c(axisLabelSize*16, "plain"),
-  font.title = c(titleSize*22, "bold"),
-  font.subtitle = c(titleSize*14, "plain"),
-  font.legend = c(axisLabelSize*16, "plain"),
   legend="right",
   add = "reg.line",
   add.params = list(linetype="dashed")
 ) + 
   geom_smooth(color=coul[3], fill="lightgray")
 
-par(mar=c(5,4,4,2) + 0.1)
-dev.off() 
+ggsave("plots/autoTags_precision_vs_recall.png", plot = scatter)
+saveWidget(ggplotly(scatter), file = "interactive/autoTags_precision_vs_recall.html")
+
 
 
 # Plot Precision distribution by category 
