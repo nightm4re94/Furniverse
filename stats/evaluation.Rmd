@@ -60,17 +60,21 @@ plotMargins <- c(6,9,12,4) + 0.1
 This section pretransforms our dataframes and assigns column names
 
 ```{r}
-stat_columns = c("variable","t","p_t-test","c","p_correlation") 
+stat_columns = c("variable","t","p_t","c","p_correlation") 
 stat_columns_comp = c("variable",
                       "variable_comp",
-                      "t-test_literal",
-                      "p_t-test_literal",
+                      "t_literal",
+                      "p_t_literal",
                       "correlation_literal",
                       "p_correlation_literal",
-                      "t-test_sentimental",
-                      "p_t-test_sentimental",
+                      "t_sentimental",
+                      "p_t_sentimental",
                       "correlation_sentimental",
-                      "p_correlation_sentimental")
+                      "p_correlation_sentimental",
+                      "t_joined",
+                      "p_t_joined",
+                      "correlation_joined",
+                      "p_correlation_joined")
 summary_names = c("Min","Q1","Median","Mean","Q3","Max","SD","Var")
 literal_names = paste(summary_names, "_literal", sep="")
 sentimental_names = paste(summary_names, "_sentimental", sep="")
@@ -137,14 +141,7 @@ mode_colors  <-  ifelse(joined_stats$mode == "literal", coul[2], coul[1])
 mode_shapes  <-  ifelse(joined_stats$mode == "literal", 15, 19)
 ```
 
-# Combined stats
-Assumptions for pearson's correlation, inspired by Cohen(1988):
-
-|correlation coefficient value|strength of correlation|
-|:----------------------------|:----------------------|
-|0.3 < \| r \| <= .5          |weak                   |
-|0.5 < \| r \| <= .7          |moderate               |
-|0.7 < \| r \| <= 1           |strong                 |
+The following function will convert probability columns to significance indicators.
 
 Convention for statistical significance:
 ns: p > 0.05
@@ -156,6 +153,30 @@ ns: p > 0.05
 ***: p <= 0.001
 
 ****: p <= 0.0001
+
+```{r}
+determine_significance <- function(p) {
+nump <- as.numeric(p)
+sig <- nump
+sig[nump>0.05] <- "ns"
+sig[nump>0.01&nump<=0.05] <- "*"
+sig[nump>0.001&nump<=0.01] <- "**"
+sig[nump>0.0001&nump<=0.001] <- "***"
+sig[nump<=0.0001] <- "****"
+sig
+}
+
+is.whole <- function(x, tol = .Machine$double.eps^0.5)  abs(x - round(x)) < tol
+```
+
+# Combined stats
+Assumptions for pearson's correlation, inspired by Cohen(1988):
+
+|correlation coefficient value|strength of correlation|
+|:----------------------------|:----------------------|
+|0.3 < \| r \| <= .5          |weak                   |
+|0.5 < \| r \| <= .7          |moderate               |
+|0.7 < \| r \| <= 1           |strong                 |
 
 ```{r}
 library(GGally)
@@ -171,24 +192,25 @@ for (title in description_vars){
   sentimentalVariableName = sprintf("%s_sentimental", title)
   literalColumn = literal_stats[,title]
   sentimentalColumn = sentimental_stats[,title]
+  jointColumn = joined_stats[,title]
 
   if(!title %in% annotator_vars_numeric&&title!="timeTaken"){
     
   # plot single variables by description mode
   st = joined_stats[,colnames(joined_stats)==title | colnames(joined_stats)=="mode"]
-  box = ggviolin(joined_stats, 
-                   x="mode", 
+  box = ggviolin(joined_stats,
+                   x="mode",
                    y=title,
                    fill="mode",
                    palette=coul,
                    alpha=0.5,
                    draw_quantiles=TRUE,
                    title = sprintf("%s, \nliteral vs. sentimental descriptions", title),
-                   add = c("boxplot"), 
+                   add = c("boxplot"),
                    add.params = list(fill = "mode",
                                      alpha=0.75)
                    ) +
-  stat_compare_means(comparisons=list(c("literal","sentimental")), 
+  stat_compare_means(comparisons=list(c("literal","sentimental")),
                        label = "p.signif",
                        bracket.size=.3,
                        vjust=.1,
@@ -198,32 +220,37 @@ for (title in description_vars){
                position=position_nudge(x=0.2), size=2.5)
   ggsave(sprintf("plots/%s_mode.png",title), plot = box)
   # saveWidget(ggplotly(box), file = sprintf("interactive/%s_mode.html", title))
-  
+
   # plot single variables by category
   st = joined_stats[,colnames(joined_stats)==title | colnames(joined_stats)=="category"]
-  box = ggviolin(joined_stats, 
-                   x="category", 
+  box = ggviolin(joined_stats,
+                   x="category",
                    y=title,
                    fill="category",
                    palette=coul_16,
                    alpha=0.5,
                    draw_quantiles=TRUE,
                    title = sprintf("%s, \ncompared by category", title),
-                   add = c("boxplot"), 
+                   add = c("boxplot"),
                    add.params = list(fill = "category",
                                      alpha=0.75)
                    )+
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
   ggsave(sprintf("plots/%s_category.png",title), plot = box)
   # saveWidget(ggplotly(box), file = sprintf("interactive/%s_category.html", title))
-  
-  
+  }
 
   t = t.test(literalColumn, sentimentalColumn)
   c = cor.test(literalColumn, sentimentalColumn)
-  summary_literal = c(summary(literalColumn),sd(literalColumn),var(literalColumn))
-  summary_sentimental = c(summary(sentimentalColumn),sd(sentimentalColumn),var(sentimentalColumn))
-  summary_joint = c(summary(joined_stats[,title]),sd(joined_stats[,title]),var(joined_stats[,title]))
+  summary_literal = c(summary(literalColumn)[-7],
+                      sd(literalColumn, na.rm=TRUE),
+                      var(literalColumn, na.rm=TRUE))
+  summary_sentimental = c(summary(sentimentalColumn)[-7],
+                          sd(sentimentalColumn, na.rm=TRUE),
+                          var(sentimentalColumn, na.rm=TRUE))
+  summary_joint = c(summary(jointColumn)[-7],
+                    sd(jointColumn, na.rm=TRUE),
+                    var(jointColumn, na.rm=TRUE))
 
   names(summary_literal)=literal_names
   names(summary_sentimental)=sentimental_names
@@ -232,24 +259,38 @@ for (title in description_vars){
   stat_vector = c(title,t$statistic,t$p.value,c$estimate,c$p.value)
   stat_vector = append(stat_vector,c(summary_literal,summary_sentimental,summary_joint),1)
   names(stat_vector)  <-  all_columns
-
   t_tests <- rbind(t_tests, stat_vector)
   
-  }
+  
   for (title_comp in description_vars){
     if (title == title_comp) {
       next
     }
     literalColumn_comp = literal_stats[,title_comp]
     sentimentalColumn_comp = sentimental_stats[,title_comp]
+    jointColumn_comp = joined_stats[,title_comp]
     t_literal = t.test(literalColumn, literalColumn_comp)
     c_literal = cor.test(literalColumn, literalColumn_comp)
 
     t_sentimental = t.test(sentimentalColumn, sentimentalColumn_comp)
     c_sentimental = cor.test(sentimentalColumn, sentimentalColumn_comp)
-    stat_vector_comp = c(title, title_comp,
-                         t_literal$statistic, t_literal$p.value, c_literal$estimate, c_literal$p.value,
-                         t_sentimental$statistic, t_sentimental$p.value, c_sentimental$estimate, c_sentimental$p.value)
+    
+    t_joined = t.test(jointColumn, jointColumn_comp)
+    c_joined = cor.test(jointColumn, jointColumn_comp)
+    stat_vector_comp = c(title, 
+                         title_comp,
+                         t_literal$statistic, 
+                         t_literal$p.value, 
+                         c_literal$estimate, 
+                         c_literal$p.value,
+                         t_sentimental$statistic, 
+                         t_sentimental$p.value, 
+                         c_sentimental$estimate, 
+                         c_sentimental$p.value,
+                         t_joined$statistic, 
+                         t_joined$p.value, 
+                         c_joined$estimate, 
+                         c_joined$p.value)
     names(stat_vector_comp) = stat_columns_comp
     
     t_tests_comp <- rbind(t_tests_comp, stat_vector_comp)
@@ -263,12 +304,12 @@ for (title in description_vars){
   st = joined_stats[,c(colnames(joined_stats)==title | colnames(joined_stats)==title_comp | colnames(joined_stats)=="mode")]
   pairs = ggpairs(st,
                    aes(colour=mode, alpha = 0.5),
-                   lower = list(combo = "dot_no_facet")) + 
-           scale_colour_manual(values = coul) + 
+                   lower = list(combo = "dot_no_facet")) +
+           scale_colour_manual(values = coul) +
            scale_fill_manual(values = coul)
   ggsave(sprintf("plots/%s_vs_%s_mode.png",title,title_comp), plot = pairs)
   # saveWidget(ggplotly(pairs), file = sprintf("interactive/%s_vs_%s_mode.html",title,title_comp));
-  
+
   # Compare by furnishing category
   st = joined_stats[,c(colnames(joined_stats)==title | colnames(joined_stats)==title_comp | colnames(joined_stats)=="category")]
   st2 = joined_stats[,c(colnames(joined_stats)==title | colnames(joined_stats)==title_comp)]
@@ -276,8 +317,8 @@ for (title in description_vars){
   pairs = ggpairs(st,
                   aes(colour=category, alpha = 0.5),
                   lower = list(combo = "dot_no_facet"),
-                  legend=9) + 
-           scale_colour_manual(values = coul_16) + 
+                  legend=9) +
+           scale_colour_manual(values = coul_16) +
            scale_fill_manual(values = coul_16)
   pairs[1,2] <- p1[1,2]
   pairs[3,3] <- pairs[3,3]+
@@ -286,44 +327,68 @@ for (title in description_vars){
     theme(axis.text.y = element_blank(),
           axis.ticks.y = element_blank())
   ggsave(sprintf("plots/%s_vs_%s_category.png",title,title_comp), plot = pairs)
-  # saveWidget(ggplotly(pairs), file = sprintf("interactive/%s_vs_%s_category.html",title, title_comp));
+  saveWidget(ggplotly(pairs), file = sprintf("interactive/%s_vs_%s_category.html",title, title_comp));
   }
 }
 # Special treatment for timings since we've recorded them independent of the description mode.
-  box = ggviolin(literal_stats$timeTaken, 
+  box = ggviolin(literal_stats$timeTaken,
                    palette=coul,
                    fill=coul[1],
                    alpha=0.5,
                    draw_quantiles=TRUE,
                    title = "timeTaken",
                    ylab = "time taken (seconds)",
-                   add = c("boxplot"), 
+                   add = c("boxplot"),
                    add.params = list(alpha=0.75),
                    ) +
   stat_summary(geom="text", fun.y=quantile,
                aes(label=sprintf("%1.2f", ..y..)),
-               position=position_nudge(x=0.2), size=2.5) +
-  theme(axis.text.x=element_blank(),
+               position=position_nudge(x=0.2), size=4.0) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
   ggsave("plots/timeTaken.png", plot = box)
   # saveWidget(ggplotly(box), file = "interactive/timeTaken.html")
 
 colnames(t_tests)=all_columns
 colnames(t_tests_comp) <- stat_columns_comp
-write.csv(t_tests,"surfaceStats.csv", row.names=FALSE)
-write.csv(t_tests_comp,"surfaceStats_comp.csv", row.names=FALSE)
+
+t_tests[,-1] <- sapply(t_tests[, -1], as.numeric)
+t_tests_comp[,-(1:2)] <- sapply(t_tests_comp[,-(1:2)], as.numeric)
+
+t_tests$p_t <- determine_significance(t_tests$p_t)
+t_tests$p_correlation <- determine_significance(t_tests$p_correlation)
+
+t_tests_comp$p_t_literal <- determine_significance(t_tests_comp$p_t_literal)
+t_tests_comp$p_correlation_literal <- determine_significance(t_tests_comp$p_correlation_literal)
+t_tests_comp$p_t_sentimental <- determine_significance(t_tests_comp$p_t_sentimental)
+t_tests_comp$p_correlation_sentimental <- determine_significance(t_tests_comp$p_correlation_sentimental)
+t_tests_comp$p_t_joined <- determine_significance(t_tests_comp$p_t_joined)
+t_tests_comp$p_correlation_joined <- determine_significance(t_tests_comp$p_correlation_joined)
+
+t_tests <- t_tests %>% mutate_if(is.numeric, ~round(.,2))
+t_tests_comp <- t_tests_comp %>% mutate_if(is.numeric, ~round(.,2))
+
+
+# Save stats sorted by significance
+write.csv(t_tests[with(t_tests, order(t_tests$p_t, t_tests$t)),],"numericStats.csv", row.names=FALSE)
+write.csv(t_tests_comp[with(t_tests_comp, 
+                            order(t_tests_comp$p_correlation_joined, t_tests_comp$correlation_joined)),],
+          "numericStats_comp.csv", 
+          row.names=FALSE)
 ```
 
 
-# Affective Analysis
+# Affective Analysis, Demographics, and Readability summary.
 ```{r}
 library(GGally)
 library(dplyr)
 library(plotly)
 library(htmlwidgets)
+library(ggpubr)
 
 # plot affective variables
-st = joined_stats[,c(3:6,36,32)]
+st = joined_stats[,c(3:6,32)]
 pairs = ggpairs(st,
                  aes(colour=mode, alpha = 0.5),
                  lower = list(combo = "dot_no_facet"),
@@ -331,23 +396,20 @@ pairs = ggpairs(st,
          scale_colour_manual(values = coul) + 
          scale_fill_manual(values = coul) 
 
-theme <- theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust = 1))
-
-pairs[6,1] <- pairs[6,1] + theme
-pairs[6,2] <- pairs[6,2] + theme
-pairs[6,3] <- pairs[6,3] + theme
-pairs[6,4] <- pairs[6,4] + theme
-pairs[6,5] <- pairs[6,5] + theme
-pairs[6,6] <- pairs[6,6] + theme
-
 ggsave("plots/affect.png", plot = pairs)
 # saveWidget(ggplotly(pairs), file = "interactive/affect.html");
+
 
 # plot numeric demography variables
 st = joined_stats[,c(38,45:47,39)]
 pairs = ggpairs(st,
                 aes(colour=gender, alpha = 0.5),
-                columnLabels = c("age \n(years)", "income \n(€ p.A.)", "household \nsize \n(persons)","living area \n(m^2)","gender"),                 lower = list(combo = "dot_no_facet"),
+                columnLabels = c("age \n(years)", 
+                                 "income \n(€ p.A.)", 
+                                 "household \nsize \n(persons)",
+                                 "living area \n(m\U00B2)",
+                                 "gender"),                 
+                lower = list(combo = "dot_no_facet"),
                 upper = list(continuous = wrap("cor", size = 3, colour = "black"))) + 
          scale_colour_manual(values = coul) + 
          scale_fill_manual(values = coul) 
@@ -457,6 +519,7 @@ library(ggpubr)
 models <- read_delim("models.csv", delim = "\t", escape_double = FALSE, trim_ws = TRUE, show_col_types = FALSE)
 models$autoTags <- strsplit(models$autoTags, ",")
 models$tags <- strsplit(models$tags, ",")
+models$category[models$category=="diningtable"] <- "dining table"
 models[c("autoTags_TP","autoTags_FP","autoTags_FN","autoTags_TN",
          "autoTags_total","autoTags_accuracy",
          "autoTags_P","autoTags_R","autoTags_F1")] <- 0
@@ -641,8 +704,8 @@ cols = c("cat1", "cat2",
           "precision_t", "precision_p(t)",
           "recall_t", "recall_p(t)",
           "f1_t", "f1_p(t)")
-t_tests = data.frame(matrix(nrow=0, ncol = length(cols)))
-names(t_tests) = cols
+t_tests_autoTags = data.frame(matrix(nrow=0, ncol = length(cols)))
+names(t_tests_autoTags) = cols
 
 for(i in 1:length(levels(factor(models$category)))){
   var = levels(factor(models$category))[i]
@@ -664,21 +727,39 @@ for(i in 1:length(levels(factor(models$category)))){
     f1_t = t.test(models$autoTags_F1[cat1], models$autoTags_F1[cat2])
 
     stat_vector = c(var, other_var,
-                    precision_mean1, precision_mean2,
-                    precision_t$statistic, precision_t$p.value,
-                    recall_mean1, recall_mean2,
-                    recall_t$statistic, recall_t$p.value,
-                    f1_mean1, f1_mean2,
-                    f1_t$statistic, f1_t$p.value)
+                    precision_mean1, 
+                    precision_mean2,
+                    recall_mean1, 
+                    recall_mean2,
+                    f1_mean1, 
+                    f1_mean2,
+                    precision_t$statistic, 
+                    precision_t$p.value,
+                    recall_t$statistic, 
+                    recall_t$p.value,
+                    f1_t$statistic, 
+                    f1_t$p.value)
     names(stat_vector)  <-  cols
-    t_tests <- rbind(t_tests, stat_vector)
+    t_tests_autoTags <- rbind(t_tests_autoTags, stat_vector)
   }
 }
-names(t_tests) <- cols
-write.csv(t_tests,"autoTagsEvaluation.csv", row.names=FALSE)
 
+names(t_tests_autoTags) <- cols
+
+t_tests_autoTags[,-c(1,2)] <- sapply(t_tests_autoTags[, -c(1,2)], as.numeric)
+t_tests_autoTags[,c(10,12,14)] <- sapply(t_tests_autoTags[, c(10,12,14)], determine_significance)
+
+t_tests_autoTags <- t_tests_autoTags %>% mutate_if(is.numeric, ~round(.,3))
+
+
+# Save stats sorted by significance
+write.csv(t_tests_autoTags[with(t_tests_autoTags,
+                                order(t_tests_autoTags$`f1_p(t)`,
+                                      t_tests_autoTags$f1_t)),],
+          "autoTagsEvaluation.csv",
+          row.names=FALSE)
 ```
-
+# Classification
 ```{r}
 library(dplyr)
 library(ggpubr)
@@ -1060,26 +1141,26 @@ dev.off()
 Plot all embeddings (categories, descriptions, images):
 ```{r}
 # Sort embeddings by type to ensure that categories are plotted after descriptions.
-total_mds_cos <- total_mds_cos[order(total_mds_cos$type, decreasing = TRUE),]
-total_mds_eucl <- total_mds_eucl[order(total_mds_eucl$type, decreasing = TRUE),]
+total_mds_cos_nomeans <- total_mds_cos[order(total_mds_cos$type, decreasing = TRUE)[total_mds_cos$type!="mean"],]
+total_mds_eucl_nomeans <- total_mds_eucl[order(total_mds_eucl$type, decreasing = TRUE)[total_mds_eucl$type!="mean"],]
 
 # all embeddings by category, MDS based on cosine dissimilarity
 png("plots/embeddings_mds_cos_all_category.png", 1400, 1400, type = 'cairo')
 ggscatter(
-     total_mds_cos, x="Dim.1", y="Dim.2",
+     total_mds_cos_nomeans, x="Dim.1", y="Dim.2",
      palette = coul_16,
-     size = 4,  
+     size = 4,
      legend = "topleft", 
      ggtheme = theme_bw(),
      color = "category",
      shape ="type",
      alpha=0.75,
      font.tickslab = c(axisLabelSize*12, "plain"),
-     font.x = c(axisLabelSize*16, "plain"),
-     font.y = c(axisLabelSize*16, "plain"),
+     font.x = c(axisLabelSize*18, "plain"),
+     font.y = c(axisLabelSize*18, "plain"),
      font.title = c(titleSize*22, "bold"),
-     font.subtitle = c(titleSize*14, "plain"),
-     font.legend = c(axisLabelSize*16, "plain"),
+     font.subtitle = c(titleSize*16, "plain"),
+     font.legend = c(axisLabelSize*18, "plain"),
      cex.main = titleSize
 ) + stat_mean(aes(fill=category),
      size=10,
@@ -1096,7 +1177,7 @@ dev.off()
 # all embeddings by category, MDS based on euclidean distance
 png("plots/embeddings_mds_eucl_all_category.png", 1400, 1400, type = 'cairo')
 ggscatter(
-     total_mds_eucl, x="Dim.1", y="Dim.2",
+     total_mds_eucl_nomeans, x="Dim.1", y="Dim.2",
      palette = coul_16,
      size = 4,  
      legend = "bottom", 
@@ -1126,9 +1207,9 @@ dev.off()
 # all embeddings by type, MDS based on cosine dissimilarity
 png("plots/embeddings_mds_cos_all_type.png", 1400, 1400, type = 'cairo')
 ggscatter(
-     total_mds_cos, x="Dim.1", y="Dim.2",
+     total_mds_cos_nomeans, x="Dim.1", y="Dim.2",
      palette = coul_16,
-     size = 4,  
+     size = 4, 
      legend = "topleft", 
      ggtheme = theme_bw(),
      color = "type",
@@ -1149,7 +1230,7 @@ dev.off()
 # all embeddings by category, MDS based on euclidean distance
 png("plots/embeddings_mds_eucl_all_type.png", 1400, 1400, type = 'cairo')
 ggscatter(
-     total_mds_eucl, x="Dim.1", y="Dim.2",
+     total_mds_eucl_nomeans, x="Dim.1", y="Dim.2",
      palette = coul_16,
      size = 4,  
      legend = "bottom", 
@@ -1359,11 +1440,12 @@ prototype_sim <- prototype_sim %*% t(prototype_sim)
 prototype_dist_cos <- as.dist(1 - prototype_sim, diag = FALSE, upper = FALSE)
 
 write.csv(as.data.frame(prototype_dist_eucl),"category_prototype_dist_eucl.csv", row.names=TRUE)
-write.csv(as.data.frame(prototype_dist_cos),"category_prototype_dist_cos.csv", row.names=TRUE)
+write.csv(as.data.frame(prototype_sim),"category_prototype_sim_cos.csv", row.names=TRUE)
 ```
 
 ```{r}
 library(ggplot2)
+library(dplyr)
 library(tidyr)
 library(shadowtext)
 library(ProcMod)
@@ -1373,58 +1455,52 @@ df_eucl <- round(as.data.frame(prototype_dist_eucl),2)
 df_eucl$category1 <- rownames(df_eucl)
 df_eucl <- df_eucl %>% select("category1", everything())
 eucl_tidied <- pivot_longer(df_eucl,cols=colnames(df_eucl)[-1], names_to='category2', values_to = "eucl") 
-png("plots/category_prototype_eucl_dist.png", 1400, 1400, type = 'cairo')
 
-ggplot(eucl_tidied,
+matr <- ggplot(eucl_tidied,
        aes(x=category1,y=rev(category2)))+ 
   geom_raster(aes(fill=eucl)) +
   scale_fill_distiller(palette = "YlGnBu", direction =1) +
-  geom_shadowtext(aes(label = eucl), color = "white", bg.colour='black', size = 7) +
+  # geom_shadowtext(aes(label = eucl), color = "white", bg.colour='black', size = 7) +
   coord_fixed()+
-  labs(title = "Euclidean distance between category prototypes") +
+  labs(title = "Euclidean distance between \ncategory prototypes") +
   labs(x = "Category 1", y = "Category 2") +
   scale_y_discrete(labels=rev(eucl_tidied$category2)) +
-  theme(legend.title = element_text(size=32),
-        legend.text = element_text(size=32),
-        legend.key.height = unit(4, 'cm'),
-        plot.title = element_text(size=48, margin = margin(0,20,20,20)),
-        plot.margin = unit(c(2, 2, 2, 2), "cm"),
-        axis.title.x = element_text(size=32, margin = margin(40,10,10,10)),
-        axis.title.y = element_text(size=32, margin = margin(10,40,10,20)),
-        axis.text = element_text(size=32),
-        axis.text.x = element_text(angle = 90, hjust = 1)
-        ) 
-dev.off()
+  theme(legend.title = element_text(size=16),
+        legend.text = element_text(size=16),
+        plot.title = element_text(size=20),
+        axis.title.x = element_text(size=20),
+        axis.title.y = element_text(size=20),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5, size = 16),
+        axis.text.y = element_text(size = 16)
+        )
+ggsave("plots/category_prototype_eucl_dist.png", plot = matr)
 
 # Plot heatmap of cosine dissimilarity between category prototypes
-df_cos <- round(as.data.frame(prototype_dist_cos),2)
+df_cos <- 1-round(as.data.frame(prototype_dist_cos),2)
 df_cos$category1 <- rownames(df_cos)
 df_cos <- df_cos %>% select("category1", everything())
 cos_tidied <- pivot_longer(df_cos,cols=colnames(df_cos)[-1], names_to='category2', values_to = "cos") 
 
-png("plots/category_prototype_cos_dist.png", 1400, 1400, type = 'cairo')
-
-ggplot(cos_tidied,
+matr <- ggplot(cos_tidied,
        aes(x=category1,y=rev(category2)))+ 
   geom_raster(aes(fill=cos)) +
   scale_fill_distiller(palette = "YlGnBu", direction =1) +
-  geom_shadowtext(aes(label = cos), color = "white", bg.colour='black', size = 7) +
+  # geom_shadowtext(aes(label = cos), color = "white", bg.colour='black', size = 7) +
   coord_fixed()+
-  labs(title = "Cosine dissimilarity between category prototypes") +
+  labs(title = "Cosine similarity between \ncategory prototypes") +
   labs(x = "Category 1", y = "Category 2") +
   scale_y_discrete(labels=rev(cos_tidied$category2)) +
-  theme(legend.title = element_text(size=32),
-        legend.text = element_text(size=32),
-        legend.key.height = unit(4, 'cm'),
-        plot.title = element_text(size=48, margin = margin(0,20,20,20)),
-        plot.margin = unit(c(2, 2, 2, 2), "cm"),
-        axis.title.x = element_text(size=32, margin = margin(40,10,10,10)),
-        axis.title.y = element_text(size=32, margin = margin(10,40,10,20)),
-        axis.text = element_text(size=32),
-        axis.text.x = element_text(angle = 90, hjust = 1)
-        ) 
+  theme(legend.title = element_text(size=16),
+        legend.text = element_text(size=16),
+        plot.title = element_text(size=20),
+        axis.title.x = element_text(size=20),
+        axis.title.y = element_text(size=20),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5, size = 16),
+        axis.text.y = element_text(size = 16)
+        )
 
-dev.off()
+ggsave("plots/category_prototype_cos_sim.png", plot = matr)
+
 
 ```
 
@@ -1577,23 +1653,15 @@ ggscatter(
 dev.off()
 
 ```
+# Embedding evaluation
 
-We need to validate whether the embeddings distances actually match the categorization and can distinguish between furnishings:
+We need to validate whether the embeddings distances actually match the categorization and can distinguish between furnishings. From now on, we will focus on cosine similarity.
 ```{r}
 library(ProcMod)
-
-closest_eucl <- data.frame(matrix(ncol = 0, nrow = 0))
-dist_df_eucl <- as.data.frame(embeddings_dist_eucl)
 
 closest_cos <- data.frame(matrix(ncol = 0, nrow = 0))
 dist_df_cos <- as.data.frame(embeddings_dist_cos)
 
-
-category_dist_eucl <- dist_df_eucl[endsWith(rownames(dist_df_eucl), "category"),]
-literal_dist_eucl <- dist_df_eucl[grepl("literal",rownames(dist_df_eucl), fixed = TRUE),]
-sentimental_dist_eucl <- dist_df_eucl[grepl("sentimental",rownames(dist_df_eucl), fixed = TRUE),]
-image_dist_eucl <- dist_df_eucl[endsWith(rownames(dist_df_eucl), ".png"),]
-model_dist_eucl <- dist_df_eucl[endsWith(rownames(dist_df_eucl), "mean"),]
 
 category_dist_cos <- dist_df_cos[endsWith(rownames(dist_df_cos), "category"),]
 literal_dist_cos <- dist_df_cos[grepl("literal",rownames(dist_df_cos), fixed = TRUE),]
@@ -1602,51 +1670,31 @@ image_dist_cos <- dist_df_cos[endsWith(rownames(dist_df_cos), ".png"),]
 model_dist_cos <- dist_df_cos[endsWith(rownames(dist_df_cos), "mean"),]
 
 
-for(col in 1:ncol(dist_df_eucl)){
-  if(endsWith(rownames(dist_df_eucl)[col], "category")){
+for(col in 1:ncol(dist_df_cos)){
+  if(endsWith(rownames(dist_df_cos)[col], "category")){
     next
   }
   # Consider the 3 nearest categories a confident decision.
-  sorted_cat_comp_eucl <- sort(category_dist_eucl[,col], index.return=TRUE)
-  nearest_cats_eucl <- rownames(category_dist_eucl)[head(sorted_cat_comp_eucl$ix[sorted_cat_comp_eucl$x>0],3)]
-  
   sorted_cat_comp_cos <- sort(category_dist_cos[,col], index.return=TRUE)
   nearest_cats_cos <- rownames(category_dist_cos)[head(sorted_cat_comp_cos$ix[sorted_cat_comp_cos$x>0],3)]
   
   # Consider the 5 nearest model means a confident decision.
-  sorted_model_comp_eucl <- sort(model_dist_eucl[,col], index.return=TRUE)
-  nearest_models_eucl <- rownames(model_dist_eucl)[head(sorted_model_comp_eucl$ix[sorted_model_comp_eucl$x>0],5)]
-  
   sorted_model_comp_cos <- sort(model_dist_cos[,col], index.return=TRUE)
   nearest_models_cos <- rownames(model_dist_cos)[head(sorted_model_comp_cos$ix[sorted_model_comp_cos$x>0],5)]
     
   # Consider the 15 nearest literal descriptions a confident decision (15 furnishings per category).
-  sorted_literal_comp_eucl <- sort(literal_dist_eucl[,col], index.return=TRUE)
-  nearest_literal_eucl <- rownames(literal_dist_eucl)[head(sorted_literal_comp_eucl$ix[sorted_literal_comp_eucl$x>0],15)]
-  
   sorted_literal_comp_cos <- sort(literal_dist_cos[,col], index.return=TRUE)
   nearest_literal_cos <- rownames(literal_dist_cos)[head(sorted_literal_comp_cos$ix[sorted_literal_comp_cos$x>0],15)]
   
   # Consider the 15 nearest sentimental descriptions a confident decision (15 furnishings per category).
-  sorted_sentimental_comp_eucl <- sort(sentimental_dist_eucl[,col], index.return=TRUE)
-  nearest_sentimental_eucl <- rownames(sentimental_dist_eucl)[head(sorted_sentimental_comp_eucl$ix[sorted_sentimental_comp_eucl$x>0],15)]
-  
   sorted_sentimental_comp_cos <- sort(sentimental_dist_cos[,col], index.return=TRUE)
   nearest_sentimental_cos <- rownames(sentimental_dist_cos)[head(sorted_sentimental_comp_cos$ix[sorted_sentimental_comp_cos$x>0],15)]
   
   # Consider the 24 nearest images a confident decision (24 images per furnishing).
-  sorted_image_comp_eucl <- sort(image_dist_eucl[,col], index.return=TRUE)
-  nearest_images_eucl <- rownames(image_dist_eucl)[head(sorted_image_comp_eucl$ix[sorted_image_comp_eucl$x>0], 24)]
-  
   sorted_image_comp_cos <- sort(image_dist_cos[,col], index.return=TRUE)
   nearest_images_cos <- rownames(image_dist_cos)[head(sorted_image_comp_cos$ix[sorted_image_comp_cos$x>0], 24)]
 
   # add row to dataframe
-  closest_eucl <- rbind(closest_eucl,c(nearest_cats_eucl,
-                                       nearest_models_eucl,
-                                       nearest_literal_eucl,
-                                       nearest_sentimental_eucl,
-                                       nearest_images_eucl))
   closest_cos <- rbind(closest_cos,c(nearest_cats_cos,                                       
                                      nearest_models_cos,
                                      nearest_literal_cos,
@@ -1663,27 +1711,130 @@ images <- paste("image", 1:24, sep="_")
 
 cnames <- c(cats, models, literals, sentimentals, images)
 
-rownames(closest_eucl) <- colnames(dist_df_eucl)[!endsWith(colnames(dist_df_eucl), "category")]
-colnames(closest_eucl) <- cnames
-
 rownames(closest_cos) <- colnames(dist_df_cos)[!endsWith(colnames(dist_df_cos), "category")]
 colnames(closest_cos) <- cnames
-```
 
+closest_cos <- apply(closest_cos,c(1, 2), function(x) sub("_.*", "", x))
+```
 
 ```{r}
-# Next, find a heuristic to determine whether an entry is correct:
-# Category: is in three most similar cats (related to target cat)
-# Model: is equal to target furnishing, in same category, or in nearest adjacent category.
-# Literal: is equal to target furnishing or the guessed furnishing is among the five most related furnishings
-# Sentimental: is equal to target furnishing or the guessed furnishing is among the five most related furnishings
-# Image: is equal to target furnishing or the guessed furnishing is among the five most related furnishings or in the correct category.
-for (r in rownames(closest_eucl)){
-  print(r)
+# Next, find a heuristic to determine whether an entry is valid:
+# category: check whether an entry's category is in the three nearest category embeddings.
+# model: check whether an entry's model ID matches any of the three nearest averaged model embeddings' IDs.
+# literal: check whether an entry's model ID matches any of the 15 nearest literal description embeddings' IDs.
+# sentimental: check whether an entry's model ID matches any of the 15 nearest sentimental description embeddings' IDs.
+# image: check whether an entry's model ID matches any of the 24 nearest image embeddings' IDs.
+# n(TRUE) / 5 is the validity score per row.
+
+cols <- c("category","model","literal","sentimental","image")
+
+closest_cos_matches <- as.data.frame(closest_cos)
+closest_cos_matches[,1:3] <- closest_cos_matches[,1:3]==sub("-.*", "", rownames(closest_cos_matches))
+closest_cos_matches[,4:62] <- closest_cos_matches[,4:62]==sub("_.*", "", rownames(closest_cos_matches))
+
+closest_cos_count <- data.frame(matrix(ncol = 5, nrow = length(rownames(closest_cos_matches))))
+rownames(closest_cos_count) <-rownames(closest_cos_matches)
+colnames(closest_cos_count) <- cols
+
+for(row in 1:nrow(closest_cos_matches)){
+  closest_cos_count[row,1] <- any(closest_cos_matches[row,1:3]) 
+  closest_cos_count[row,2] <- any(closest_cos_matches[row,4:8]) 
+  closest_cos_count[row,3] <- any(closest_cos_matches[row,9:23]) 
+  closest_cos_count[row,4] <- any(closest_cos_matches[row,24:38]) 
+  closest_cos_count[row,5] <- any(closest_cos_matches[row,39:62]) 
+  closest_cos_count$score[row] <- sum(closest_cos_count[row, 1:5]) / 5
+  
 }
+write.csv(closest_cos_count,"cos_validity.csv", row.names=TRUE)
+```
+Evaluate validity subsets: 
+```{r}
+library(dplyr)
+literal_cos_count <- closest_cos_count[grepl("literal",rownames(closest_cos_count), fixed = TRUE),]
+sentimental_cos_count <- closest_cos_count[grepl("sentimental",rownames(closest_cos_count), fixed = TRUE),]
+image_cos_count <- closest_cos_count[endsWith(rownames(closest_cos_count), ".png"),]
+model_cos_count <- closest_cos_count[endsWith(rownames(closest_cos_count), "mean"),]
+
+cos_validity_summary <- data.frame(matrix(ncol = 6, nrow = 0))
+
+cos_validity_summary <- rbind(cos_validity_summary, model = c(summary(model_cos_count$score),
+                                                                sd(model_cos_count$score),
+                                                                var(model_cos_count$score)))
+cos_validity_summary <- rbind(cos_validity_summary, literal = c(summary(literal_cos_count$score),
+                                                                sd(literal_cos_count$score),
+                                                                var(literal_cos_count$score)))
+cos_validity_summary <- rbind(cos_validity_summary, sentimental = c(summary(sentimental_cos_count$score),
+                                                                sd(sentimental_cos_count$score),
+                                                                var(sentimental_cos_count$score)))
+cos_validity_summary <- rbind(cos_validity_summary, image = c(summary(image_cos_count$score),
+                                                                sd(image_cos_count$score),
+                                                                var(image_cos_count$score)))
+rownames(cos_validity_summary) <- cols[-1]
+
+for(model in all_models){
+  md_cos_count <- closest_cos_count[sub("_.*", "", rownames(closest_cos_count))==model,]
+  cos_validity_summary <- rbind(cos_validity_summary, c(summary(md_cos_count$score),
+                                                        sd(md_cos_count$score),
+                                                        var(md_cos_count$score)))
+  rownames(cos_validity_summary)[length(rownames(cos_validity_summary))]  <- model
+}
+
+for(cat in categories){
+  cat_cos_count <- closest_cos_count[sub("-.*", "", rownames(closest_cos_count))==cat,]
+  cos_validity_summary <- rbind(cos_validity_summary, c(summary(cat_cos_count$score),
+                                                        sd(cat_cos_count$score),
+                                                        var(cat_cos_count$score)))
+  rownames(cos_validity_summary)[length(rownames(cos_validity_summary))]  <- paste(cat, "category", sep="_")
+}
+
+for(angle in c(0,45,90,135,180,225,270,315)){
+  angle_cos_count <- image_cos_count[sapply(strsplit(rownames(image_cos_count),"_"), "[[" , 2)==angle,]
+  cos_validity_summary <- rbind(cos_validity_summary, c(summary(angle_cos_count$score),
+                                                        sd(angle_cos_count$score),
+                                                        var(angle_cos_count$score)))
+  rownames(cos_validity_summary)[length(rownames(cos_validity_summary))]  <- paste(angle, "angle", sep="_")
+}
+
+for(tilt in c("down","frontal","up")){
+  tilt_cos_count <- image_cos_count[sub(".png*", "", sapply(strsplit(rownames(image_cos_count),"_"), "[[" , 3))==tilt,]
+  cos_validity_summary <- rbind(cos_validity_summary, c(summary(tilt_cos_count$score),
+                                                        sd(tilt_cos_count$score),
+                                                        var(tilt_cos_count$score)))
+  rownames(cos_validity_summary)[length(rownames(cos_validity_summary))]  <- paste(tilt, "tilt", sep="_")
+}
+
+colnames(cos_validity_summary) <- summary_names
+cos_validity_summary <- apply(cos_validity_summary, c(1,2), function(x) round(as.numeric(x),4))
+
+scorelist <- list(c("model",model_cos_count$score), 
+                   c("literal",literal_cos_count$score), 
+                   c("sentimental",sentimental_cos_count$score), 
+                   c("image",image_cos_count$score))
+cos_validity_comp <- data.frame(matrix(ncol = 4, nrow = 0))
+
+for(grp1 in scorelist){
+  for(grp2 in scorelist){
+    if(grp1[1]==grp2[1]){
+      next()
+    }
+    t <- t.test(as.numeric(grp1[-1]), as.numeric(grp2[-1]))
+    cos_validity_comp <- rbind(cos_validity_comp, c(grp1[1], grp2[1], t$statistic, t$p.value))
+  }
+}
+colnames(cos_validity_comp) <- c("grp1","grp2","t","p_t")
+cos_validity_comp$p_t <- determine_significance(cos_validity_comp$p_t)
+cos_validity_comp$t <- as.numeric(cos_validity_comp$t)
+
+write.csv(cos_validity_summary,"cos_validity_stats.csv", row.names=TRUE)
+write.csv(cos_validity_comp[with(cos_validity_comp, 
+                            order(cos_validity_comp$p_t,
+                                  cos_validity_comp$t, decreasing=TRUE)),],
+          "cos_validity_comp.csv", row.names=FALSE)
+
 ```
 
 
+# Feedback
 Process the annotator feedback:
 ```{r}
 library(dplyr)
@@ -1723,7 +1874,16 @@ bars <- ggplot(r2,
   coord_flip()+
   scale_y_reverse(labels=c("100%","75%","50%","25%","0%"))+
   scale_x_discrete(limits = rev(colnames(numeric.feedback)))+
-  scale_fill_manual(values = coul_div)
+  scale_fill_manual(values = coul_div)+
+  theme(legend.title = element_text(size=10),
+        legend.text = element_text(size=10),
+        plot.title = element_text(size=12),
+        axis.title.x = element_text(size=12),
+        axis.title.y = element_text(size=12),
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 10)
+        )
+
 ggsave("plots/feedback.png", plot = bars)
 # saveWidget(ggplotly(bars), file = "interactive/feedback.html")
 
